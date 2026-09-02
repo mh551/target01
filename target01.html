@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 シューティングターゲット</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #121212;
+      color: #ffffff;
+      text-align: center;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 { color: #00e676; font-size: 24px; }
+    .card {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    button {
+      background-color: #00e676;
+      color: #000000;
+      border: none;
+      padding: 15px 30px;
+      font-size: 18px;
+      font-weight: bold;
+      border-radius: 8px;
+      width: 100%;
+      margin: 8px 0;
+      cursor: pointer;
+    }
+    button:active { background-color: #00b359; }
+    .btn-connect { background-color: #29b6f6; color: #fff; }
+    .log-box {
+      background: #000;
+      color: #00ff00;
+      font-family: monospace;
+      padding: 10px;
+      border-radius: 6px;
+      height: 180px;
+      overflow-y: scroll;
+      text-align: left;
+      font-size: 14px;
+    }
+    #status { font-size: 14px; color: #aaa; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+
+  <h1>🎯 ESP32 Target Controller</h1>
+  
+  <div class="card">
+    <div id="status">状態: 未接続</div>
+    <button class="btn-connect" onclick="connectBT()">Bluetooth 接続</button>
+  </div>
+
+  <div class="card">
+    <h3>ゲームモード選択</h3>
+    <button onclick="sendCmd('1')">1: 60秒タイムアタック</button>
+    <button onclick="sendCmd('2')">2: スピードクリア</button>
+  </div>
+
+  <div class="card">
+    <h3>通信ログ / スコア</h3>
+    <div id="log" class="log-box"></div>
+  </div>
+
+  <script>
+    let bluetoothDevice;
+    let rxCharacteristic;
+
+    // Web Bluetooth 接続関数
+    async function connectBT() {
+      try {
+        document.getElementById('status').innerText = '検索中...';
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ['00001101-0000-1000-8000-00805f9b34fb'] // SPP UUID
+        });
+
+        const server = await bluetoothDevice.gatt.connect();
+        document.getElementById('status').innerText = '接続完了: ' + bluetoothDevice.name;
+        log('Bluetoothに接続しました！');
+
+      } catch (error) {
+        console.error(error);
+        document.getElementById('status').innerText = '接続失敗';
+        log('エラー: ' + error);
+      }
+    }
+
+    // コマンド送信関数
+    async function sendCmd(cmd) {
+      if (!bluetoothDevice || !bluetoothDevice.gatt.connected) {
+        alert('先にBluetooth接続を行ってください。');
+        return;
+      }
+      // 送信処理（アプリ/ブラウザ経由）
+      log('送信: モード ' + cmd);
+    }
+
+    function log(msg) {
+      const logBox = document.getElementById('log');
+      logBox.innerHTML += msg + '<br>';
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>
