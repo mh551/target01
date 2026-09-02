@@ -2,95 +2,220 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32 シューティングターゲット</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>ESP32 Target Monitor</title>
   <style>
+    :root {
+      --bg-color: #0b0c10;
+      --card-bg: #1f2833;
+      --accent-color: #66fcf1;
+      --accent-orange: #ff3e3e;
+      --text-color: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background-color: #121212;
-      color: #ffffff;
-      text-align: center;
-      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
       margin: 0;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
     }
-    h1 { color: #00e676; font-size: 22px; margin-bottom: 20px; }
-    .card {
-      background: #1e1e1e;
+
+    /* ヘッダー・接続エリア */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      padding: 8px 12px;
       border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 15px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      margin-bottom: 10px;
     }
-    button {
+    .status-text {
+      font-size: 13px;
+      color: #c5c6c7;
+      font-weight: bold;
+    }
+    .status-text.online { color: var(--accent-color); }
+
+    .btn-connect {
+      background: #45a29e;
+      color: #fff;
       border: none;
-      padding: 15px 20px;
-      font-size: 16px;
+      padding: 8px 14px;
+      font-size: 13px;
       font-weight: bold;
       border-radius: 8px;
-      width: 100%;
-      margin: 8px 0;
       cursor: pointer;
     }
-    .btn-connect { background-color: #29b6f6; color: #fff; }
-    .btn-start { background-color: #ff3d00; color: #fff; font-size: 20px; }
-    button:active { opacity: 0.8; }
+
+    /* モード選択 */
+    .mode-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .mode-btn {
+      background: var(--card-bg);
+      border: 2px solid #0b0c10;
+      color: #c5c6c7;
+      padding: 8px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: bold;
+      text-align: center;
+      cursor: pointer;
+    }
+    .mode-btn.active {
+      border-color: var(--accent-color);
+      color: var(--accent-color);
+      background: rgba(102, 252, 241, 0.1);
+    }
+
+    /* メイン巨大モニター画面 */
+    .display-screen {
+      flex: 1;
+      background: var(--card-bg);
+      border-radius: 16px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      border: 2px solid #1f2833;
+      position: relative;
+      margin-bottom: 10px;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    .btn-stop-corner {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255, 62, 62, 0.2);
+      border: 2px solid var(--accent-orange);
+      color: var(--accent-orange);
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 900;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      z-index: 10;
+      transition: all 0.2s ease;
+    }
+    .btn-stop-corner:active {
+      background: var(--accent-orange);
+      color: #fff;
+      transform: scale(0.95);
+    }
+
+    .display-title {
+      font-size: 14px;
+      color: #c5c6c7;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .main-val {
+      font-size: clamp(60px, 18vw, 110px);
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1;
+      font-family: 'Impact', 'Arial Black', sans-serif;
+      text-shadow: 0 0 20px rgba(255,255,255,0.2);
+      transition: transform 0.1s ease;
+    }
     
-    .mode-select {
-      text-align: left;
-      margin: 15px 0;
-      font-size: 16px;
+    .main-val.pop {
+      transform: scale(1.15);
+      color: var(--accent-color);
     }
-    .mode-select label {
-      display: block;
-      padding: 10px;
-      background: #2a2a2a;
-      border-radius: 6px;
-      margin-bottom: 8px;
+    .main-val.countdown {
+      color: var(--accent-orange);
+      font-size: clamp(80px, 25vw, 140px);
+    }
+
+    .sub-val {
+      font-size: clamp(16px, 4vw, 24px);
+      color: var(--accent-color);
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    .btn-start {
+      background: var(--accent-color);
+      color: #0b0c10;
+      border: none;
+      padding: 16px;
+      font-size: 20px;
+      font-weight: 900;
+      border-radius: 12px;
+      width: 100%;
+      letter-spacing: 2px;
+      box-shadow: 0 4px 15px rgba(102, 252, 241, 0.3);
       cursor: pointer;
+      margin-bottom: 8px;
     }
-    .mode-select input { margin-right: 10px; transform: scale(1.3); }
+    .btn-start:active { transform: scale(0.98); }
 
     .log-box {
       background: #000;
       color: #00ff00;
       font-family: monospace;
-      padding: 10px;
-      border-radius: 6px;
-      height: 220px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      height: 50px;
       overflow-y: scroll;
       text-align: left;
-      font-size: 14px;
-      line-height: 1.4;
+      font-size: 10px;
+      border: 1px solid #1f2833;
     }
-    #status { font-size: 14px; color: #aaa; margin-bottom: 10px; }
   </style>
 </head>
 <body>
 
-  <h1>🎯 ESP32 Target Controller</h1>
-  
-  <div class="card">
-    <div id="status">状態: 未接続</div>
-    <button class="btn-connect" onclick="connectBT()">1. Bluetooth 接続</button>
+  <div class="header">
+    <div id="status" class="status-text">未接続</div>
+    <button class="btn-connect" onclick="connectBT()">BT接続</button>
   </div>
 
-  <div class="card">
-    <h3>2. モード選択</h3>
-    <div class="mode-select">
-      <label>
-        <input type="radio" name="gameMode" value="1" checked> 1: 60秒タイムアタック
-      </label>
-      <label>
-        <input type="radio" name="gameMode" value="2"> 2: スピードクリア (一斉起立)
-      </label>
+  <div class="mode-container">
+    <div id="mode1-btn" class="mode-btn active" onclick="selectMode('1')">
+      ① タイムアタック<br><small>(60秒スコア)</small>
     </div>
-    <button class="btn-start" onclick="startGame()">▶ GAME START</button>
+    <div id="mode2-btn" class="mode-btn" onclick="selectMode('2')">
+      ② スピードクリア<br><small>(一斉起立タイム)</small>
+    </div>
   </div>
 
-  <div class="card">
-    <h3>スコア・実況ログ</h3>
-    <div id="log" class="log-box"></div>
+  <div class="display-screen">
+    <button class="btn-stop-corner" onclick="stopGame()">
+      ⏹ 中止
+    </button>
+
+    <div id="display-title" class="display-title">READY</div>
+    <div id="main-val" class="main-val">READY</div>
+    <div id="sub-val" class="sub-val"></div>
   </div>
+
+  <button class="btn-start" onclick="startGame()">▶ START</button>
+
+  <div id="log" class="log-box">接続待ち...</div>
 
   <script>
     const SERVICE_UUID           = "00001101-0000-1000-8000-00805f9b34fb";
@@ -99,17 +224,78 @@
 
     let bluetoothDevice;
     let rxCharacteristic;
+    let currentMode = '1';
+
+    // --- Web Audio API (大音量サウンドエンジン) ---
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // 周波数(Hz)と鳴らす時間(秒)を指定して発音する（歪み制限ギリギリの大音量設定）
+    function playBeep(freq, duration, type = 'square') {
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = type; // 'square'（矩形波）で通る音（電子音）にする
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+        // 音量を安全上限(1.0)に設定
+        gain.gain.setValueAtTime(0.9, audioCtx.currentTime);
+        // 音の終わりに小さなクリック音が発生するのを防止する減衰設定
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.error("Audio Error:", e);
+      }
+    }
+
+    function selectMode(mode) {
+      currentMode = mode;
+      document.getElementById('mode1-btn').classList.toggle('active', mode === '1');
+      document.getElementById('mode2-btn').classList.toggle('active', mode === '2');
+      resetDisplay();
+    }
+
+    function resetDisplay() {
+      const title = document.getElementById('display-title');
+      const main = document.getElementById('main-val');
+      const sub = document.getElementById('sub-val');
+      
+      main.className = 'main-val';
+      sub.innerText = '';
+
+      if (currentMode === '1') {
+        title.innerText = "TIME ATTACK";
+        main.innerText = "60s";
+      } else {
+        title.innerText = "SPEED CLEAR";
+        main.innerText = "0.00s";
+      }
+    }
 
     async function connectBT() {
+      initAudio(); // ユーザー操作のタイミングでオーディオ有効化
       try {
-        document.getElementById('status').innerText = '全デバイスを検索中...';
+        document.getElementById('status').innerText = '検索中...';
         
         bluetoothDevice = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: [SERVICE_UUID]
         });
-
-        document.getElementById('status').innerText = '接続処理中...';
 
         const server = await bluetoothDevice.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
@@ -120,8 +306,10 @@
         await txCharacteristic.startNotifications();
         txCharacteristic.addEventListener('characteristicvaluechanged', handleData);
 
-        document.getElementById('status').innerText = '接続成功: ' + (bluetoothDevice.name || 'ESP32');
-        log('--- 接続完了！モードを選んでSTARTを押してください ---');
+        const statusEl = document.getElementById('status');
+        statusEl.innerText = '接続完了';
+        statusEl.classList.add('online');
+        log('--- 接続完了！ ---');
 
       } catch (error) {
         console.error(error);
@@ -131,26 +319,120 @@
     }
 
     async function startGame() {
+      initAudio(); // タップ時に確実にオーディオ起動
       if (!rxCharacteristic) {
-        alert('先に「Bluetooth 接続」を行ってください。');
+        alert('先に「BT接続」を行ってください。');
         return;
       }
-      
-      // 選択されているラジオボタンの値を取得 ('1' または '2')
-      const selectedMode = document.querySelector('input[name="gameMode"]:checked').value;
-      
       try {
         const encoder = new TextEncoder();
-        await rxCharacteristic.writeValue(encoder.encode(selectedMode));
+        await rxCharacteristic.writeValue(encoder.encode(currentMode));
       } catch (error) {
         log('送信エラー: ' + error);
       }
     }
 
+    async function stopGame() {
+      initAudio();
+      if (!rxCharacteristic) {
+        resetDisplay();
+        return;
+      }
+      try {
+        const encoder = new TextEncoder();
+        await rxCharacteristic.writeValue(encoder.encode('0'));
+        log('>>> ゲームを途中で中止しました');
+        
+        const title = document.getElementById('display-title');
+        const main = document.getElementById('main-val');
+        const sub = document.getElementById('sub-val');
+        
+        title.innerText = "STOPPED";
+        main.className = 'main-val';
+        main.innerText = "CANCEL";
+        sub.innerText = "中止されました";
+
+        setTimeout(resetDisplay, 1500);
+      } catch (error) {
+        log('中止送信エラー: ' + error);
+        resetDisplay();
+      }
+    }
+
+    // ESP32からのデータ受信処理
     function handleData(event) {
       const decoder = new TextDecoder('utf-8');
       const text = decoder.decode(event.target.value);
       log(text);
+
+      const main = document.getElementById('main-val');
+      const title = document.getElementById('display-title');
+      const sub = document.getElementById('sub-val');
+
+      // 1. カウントダウン発音制御
+      if (text.includes("3...")) {
+        title.innerText = "GET READY";
+        main.innerText = "3";
+        main.className = 'main-val countdown';
+        playBeep(880, 0.2); // カウントダウン音 (880Hz / 0.2秒)
+      } else if (text.includes("2...")) {
+        main.innerText = "2";
+        playBeep(880, 0.2);
+      } else if (text.includes("1...")) {
+        main.innerText = "1";
+        playBeep(880, 0.2);
+      } else if (text.includes("GO!!")) {
+        title.innerText = "FIRE!!";
+        main.innerText = "GO!";
+        main.className = 'main-val pop';
+        playBeep(1760, 1.0, 'sawtooth'); // GO発音 (高音1760Hz / 1.0秒間ロングトーン)
+        
+        setTimeout(() => {
+          if (currentMode === '1') {
+            main.className = 'main-val';
+            main.innerText = "0 点";
+          }
+        }, 800);
+      }
+
+      // 2. スコア検知
+      if (text.includes("スコア:")) {
+        const match = text.match(/スコア:\s*(\d+)/);
+        if (match) {
+          title.innerText = "SCORE";
+          main.innerText = match[1] + " 点";
+          main.classList.add('pop');
+          playBeep(1200, 0.1, 'sine'); // ヒット音（短い高音）
+          setTimeout(() => main.classList.remove('pop'), 200);
+        }
+      }
+
+      // 3. 残り時間
+      if (text.includes("残り時間:")) {
+        const match = text.match(/残り時間:\s*(\d+)/);
+        if (match) {
+          sub.innerText = "⏰ 残り " + match[1] + " 秒";
+        }
+      }
+
+      // 4. クリアタイム検知
+      if (text.includes("クリアタイム:")) {
+        const match = text.match(/クリアタイム:\s*([\d\.]+)/);
+        if (match) {
+          title.innerText = "CLEAR TIME!";
+          main.innerText = match[1] + "s";
+          main.className = 'main-val pop';
+          sub.innerText = "🏁 FINISH!!";
+          playBeep(1500, 0.4); // クリアファンファーレ音
+        }
+      }
+
+      // 5. タイムアップ
+      if (text.includes("TIME UP!")) {
+        title.innerText = "FINISH";
+        sub.innerText = "タイムアップ！";
+        playBeep(440, 0.8, 'sawtooth'); // 低音ブザー音
+      }
     }
 
     function log(msg) {
@@ -158,6 +440,8 @@
       logBox.innerHTML += msg.replace(/\n/g, '<br>');
       logBox.scrollTop = logBox.scrollHeight;
     }
+
+    selectMode('1');
   </script>
 </body>
 </html>
