@@ -6,27 +6,27 @@
   <title>ESP32 シューティングターゲット</title>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
       background-color: #121212;
       color: #ffffff;
       text-align: center;
       padding: 20px;
       margin: 0;
     }
-    h1 { color: #00e676; font-size: 24px; }
+    h1 { color: #00e676; font-size: 22px; margin-bottom: 20px; }
     .card {
       background: #1e1e1e;
       border-radius: 12px;
       padding: 20px;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
     button {
       background-color: #00e676;
       color: #000000;
       border: none;
-      padding: 15px 30px;
-      font-size: 18px;
+      padding: 15px 20px;
+      font-size: 16px;
       font-weight: bold;
       border-radius: 8px;
       width: 100%;
@@ -41,10 +41,10 @@
       font-family: monospace;
       padding: 10px;
       border-radius: 6px;
-      height: 180px;
+      height: 200px;
       overflow-y: scroll;
       text-align: left;
-      font-size: 14px;
+      font-size: 13px;
     }
     #status { font-size: 14px; color: #aaa; margin-bottom: 10px; }
   </style>
@@ -65,47 +65,73 @@
   </div>
 
   <div class="card">
-    <h3>通信ログ / スコア</h3>
+    <h3>スコア・通信ログ</h3>
     <div id="log" class="log-box"></div>
   </div>
 
   <script>
+    const SERVICE_UUID           = "00001101-0000-1000-8000-00805f9b34fb";
+    const CHARACTERISTIC_UUID_RX = "00001102-0000-1000-8000-00805f9b34fb";
+    const CHARACTERISTIC_UUID_TX = "00001103-0000-1000-8000-00805f9b34fb";
+
     let bluetoothDevice;
     let rxCharacteristic;
 
-    // Web Bluetooth 接続関数
     async function connectBT() {
       try {
-        document.getElementById('status').innerText = '検索中...';
+        document.getElementById('status').innerText = '全デバイスを検索中...';
+        
+        // 【修正点】filtersを解除し、周囲のすべてのBLE機器を表示
         bluetoothDevice = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
-          optionalServices: ['00001101-0000-1000-8000-00805f9b34fb'] // SPP UUID
+          optionalServices: [SERVICE_UUID]
         });
 
+        document.getElementById('status').innerText = '接続処理中...';
+        log('デバイス選択: ' + (bluetoothDevice.name || '名称未設定デバイス'));
+
         const server = await bluetoothDevice.gatt.connect();
-        document.getElementById('status').innerText = '接続完了: ' + bluetoothDevice.name;
-        log('Bluetoothに接続しました！');
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        
+        rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_RX);
+        
+        const txCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_TX);
+        await txCharacteristic.startNotifications();
+        txCharacteristic.addEventListener('characteristicvaluechanged', handleData);
+
+        document.getElementById('status').innerText = '接続成功: ' + (bluetoothDevice.name || 'ESP32');
+        log('--- 接続完了！ ---');
 
       } catch (error) {
         console.error(error);
-        document.getElementById('status').innerText = '接続失敗';
+        document.getElementById('status').innerText = '接続失敗またはキャンセル';
         log('エラー: ' + error);
       }
     }
 
-    // コマンド送信関数
     async function sendCmd(cmd) {
-      if (!bluetoothDevice || !bluetoothDevice.gatt.connected) {
-        alert('先にBluetooth接続を行ってください。');
+      if (!rxCharacteristic) {
+        alert('先に「Bluetooth 接続」を行ってください。');
         return;
       }
-      // 送信処理（アプリ/ブラウザ経由）
-      log('送信: モード ' + cmd);
+      try {
+        const encoder = new TextEncoder();
+        await rxCharacteristic.writeValue(encoder.encode(cmd));
+        log('>> モード ' + cmd + ' 開始要求');
+      } catch (error) {
+        log('送信エラー: ' + error);
+      }
+    }
+
+    function handleData(event) {
+      const decoder = new TextDecoder('utf-8');
+      const text = decoder.decode(event.target.value);
+      log(text);
     }
 
     function log(msg) {
       const logBox = document.getElementById('log');
-      logBox.innerHTML += msg + '<br>';
+      logBox.innerHTML += msg.replace(/\n/g, '<br>');
       logBox.scrollTop = logBox.scrollHeight;
     }
   </script>
