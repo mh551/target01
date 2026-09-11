@@ -207,13 +207,15 @@
   <div id="log" class="log-box">接続待ち...</div>
 
   <script>
-    const SERVICE_UUID           = "00001101-0000-1000-8000-00805f9b34fb";
-    const CHARACTERISTIC_UUID_RX = "00001102-0000-1000-8000-00805f9b34fb";
-    const CHARACTERISTIC_UUID_TX = "00001103-0000-1000-8000-00805f9b34fb";
+    // ESP32プログラムと合致するBLE UUID (小文字表記)
+    const SERVICE_UUID           = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const CHARACTERISTIC_UUID_RX = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+    const CHARACTERISTIC_UUID_TX = "8260c02c-502a-466d-a19e-e31448b1116b";
 
     let bluetoothDevice;
     let rxCharacteristic;
     let currentMode = '1';
+    let currentScore = 0;
 
     let audioCtx = null;
 
@@ -248,7 +250,6 @@
       }
     }
 
-    // 2秒間のサイレン風アラート音
     function playAlertSound() {
       try {
         initAudio();
@@ -290,6 +291,7 @@
       
       main.className = 'main-val';
       sub.innerText = '';
+      currentScore = 0;
 
       if (currentMode === '1') {
         title.innerText = "TIME ATTACK";
@@ -309,7 +311,7 @@
         document.getElementById('status').innerText = '検索中...';
         
         bluetoothDevice = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
+          filters: [{ name: 'TargetGame_4P' }],
           optionalServices: [SERVICE_UUID]
         });
 
@@ -325,7 +327,7 @@
         const statusEl = document.getElementById('status');
         statusEl.innerText = '接続完了';
         statusEl.classList.add('online');
-        log('--- 接続完了！ ---');
+        log('--- Bluefy 接続完了！ ---');
 
       } catch (error) {
         console.error(error);
@@ -342,7 +344,9 @@
       }
       try {
         const encoder = new TextEncoder();
-        await rxCharacteristic.writeValue(encoder.encode(currentMode));
+        const cmd = "START_MODE" + currentMode;
+        await rxCharacteristic.writeValue(encoder.encode(cmd));
+        log('>>> 送信: ' + cmd);
       } catch (error) {
         log('送信エラー: ' + error);
       }
@@ -356,8 +360,8 @@
       }
       try {
         const encoder = new TextEncoder();
-        await rxCharacteristic.writeValue(encoder.encode('0'));
-        log('>>> 中止送信');
+        await rxCharacteristic.writeValue(encoder.encode('STOP'));
+        log('>>> 中止送信: STOP');
         
         const title = document.getElementById('display-title');
         const main = document.getElementById('main-val');
@@ -375,81 +379,86 @@
       }
     }
 
+    // Web App側のカウントダウンタイマー
+    function startWebCountdown() {
+      const title = document.getElementById('display-title');
+      const main = document.getElementById('main-val');
+      
+      title.innerText = "GET READY";
+      main.className = 'main-val countdown';
+      
+      let count = 3;
+      main.innerText = count;
+      playBeep(880, 0.2);
+
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          main.innerText = count;
+          playBeep(880, 0.2);
+        } else {
+          clearInterval(timer);
+        }
+      }, 1000);
+    }
+
     function handleData(event) {
       const decoder = new TextDecoder('utf-8');
-      const text = decoder.decode(event.target.value);
-      log(text);
+      const text = decoder.decode(event.target.value).trim();
+      log("受信: " + text);
 
       const main = document.getElementById('main-val');
       const title = document.getElementById('display-title');
       const sub = document.getElementById('sub-val');
 
-      if (text.includes("3...")) {
-        title.innerText = "GET READY";
-        main.innerText = "3";
-        main.className = 'main-val countdown';
-        playBeep(880, 0.2);
-      } else if (text.includes("2...")) {
-        main.innerText = "2";
-        playBeep(880, 0.2);
-      } else if (text.includes("1...")) {
-        main.innerText = "1";
-        playBeep(880, 0.2);
-      } else if (text.includes("GO!!")) {
+      if (text === "COUNTDOWN") {
+        startWebCountdown();
+      } 
+      else if (text === "GAME_START") {
         title.innerText = "FIRE!!";
         main.innerText = "GO!";
         main.className = 'main-val pop';
-        playBeep(1760, 1.0, 'sawtooth');
+        playBeep(1760, 0.8, 'sawtooth');
         
         setTimeout(() => {
           if (currentMode === '1' || currentMode === '3') {
             main.className = 'main-val';
+            currentScore = 0;
             main.innerText = "0 点";
+          } else if (currentMode === '2') {
+            main.className = 'main-val';
+            main.innerText = "PLAYING";
           }
         }, 800);
       }
-
-      if (text.includes("SPEED_UP")) {
+      else if (text.startsWith("HIT:")) {
+        currentScore++;
+        if (currentMode === '1' || currentMode === '3') {
+          title.innerText = "SCORE";
+          main.innerText = currentScore + " 点";
+          main.classList.add('pop');
+          playBeep(1200, 0.1, 'sine');
+          setTimeout(() => main.classList.remove('pop'), 150);
+        } else {
+          playBeep(1200, 0.1, 'sine');
+        }
+      }
+      else if (text === "SPEED_UP") {
         sub.innerText = "🚨 SPEED UP!! (1秒モード)";
         playAlertSound();
       }
-
-      if (text.includes("スコア:")) {
-        const match = text.match(/スコア:\s*(\d+)/);
-        if (match) {
-          title.innerText = "SCORE";
-          main.innerText = match[1] + " 点";
-          main.classList.add('pop');
-          playBeep(1200, 0.1, 'sine');
-          setTimeout(() => main.classList.remove('pop'), 200);
-        }
+      else if (text.startsWith("CLEAR:")) {
+        const timeVal = text.split(":")[1];
+        title.innerText = "CLEAR TIME!";
+        main.innerText = timeVal + "s";
+        main.className = 'main-val pop';
+        sub.innerText = "🏁 CLEAR!!";
+        playBeep(1500, 0.5);
       }
-
-      if (text.includes("残り時間:")) {
-        const match = text.match(/残り時間:\s*(\d+)/);
-        if (match) {
-          const sec = parseInt(match[1]);
-          if (currentMode === '3' && sec <= 20 && sec > 0) {
-            sub.innerText = "🔥 SPEED UP!! 残り " + sec + " 秒";
-          } else {
-            sub.innerText = "⏰ 残り " + sec + " 秒";
-          }
-        }
-      }
-
-      if (text.includes("クリアタイム:")) {
-        const match = text.match(/クリアタイム:\s*([\d\.]+)/);
-        if (match) {
-          title.innerText = "CLEAR TIME!";
-          main.innerText = match[1] + "s";
-          main.className = 'main-val pop';
-          sub.innerText = "🏁 CLEAR!!";
-          playBeep(1500, 0.4);
-        }
-      }
-
-      if (text.includes("TIME UP!")) {
+      else if (text.startsWith("TIME_UP:")) {
+        const finalScore = text.split(":")[1];
         title.innerText = "FINISH";
+        main.innerText = finalScore + " 点";
         sub.innerText = "タイムアップ！";
         playBeep(440, 0.8, 'sawtooth');
       }
@@ -457,9 +466,12 @@
 
     function log(msg) {
       const logBox = document.getElementById('log');
-      logBox.innerHTML += msg.replace(/\n/g, '<br>');
+      logBox.innerHTML += msg.replace(/\n/g, '<br>') + '<br>';
       logBox.scrollTop = logBox.scrollHeight;
     }
+  </script>
+</body>
+</html>
 
     selectMode('1');
   </script>
