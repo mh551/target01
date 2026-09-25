@@ -248,7 +248,7 @@
 
       try {
         const device = await navigator.bluetooth.requestDevice({
-          filters: [{ services: [SERVICE_UUID] }],
+          acceptAllDevices: true, // 全機器を許可
           optionalServices: [SERVICE_UUID]
         });
 
