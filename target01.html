@@ -45,10 +45,10 @@
       margin-bottom: 20px;
     }
     .status-text {
-      font-size: 3.2rem;
+      font-size: 3.5rem;
       font-weight: 900;
       color: #ffd60a;
-      min-height: 4rem;
+      min-height: 4.5rem;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -69,7 +69,7 @@
       gap: 15px;
     }
 
-    /* モード選択エリア（ラジオボタン風カード） */
+    /* モード選択エリア */
     .mode-select-group {
       display: flex;
       flex-direction: column;
@@ -141,7 +141,7 @@
       </label>
     </div>
 
-    <!-- スタートボタン（単一） -->
+    <!-- スタートボタン -->
     <button class="btn-start" onclick="startGame()">
       ▶ スタート
     </button>
@@ -161,7 +161,6 @@
     let selectedModeNum = 1;
     let countdownTimer = null;
 
-    // モード選択時の表示変更
     function selectMode(modeNum) {
       selectedModeNum = modeNum;
       for (let i = 1; i <= 3; i++) {
@@ -174,7 +173,6 @@
       }
     }
 
-    // iPhone用 Web Audio API (効果音)
     function playBeep(freq, duration) {
       try {
         if (!audioCtx) {
@@ -197,7 +195,6 @@
       }
     }
 
-    // Bluetooth 接続処理
     async function connectBLE() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -230,7 +227,6 @@
       }
     }
 
-    // スタートボタン押下時
     async function startGame() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') await audioCtx.resume();
@@ -246,14 +242,12 @@
 
       try {
         const encoder = new TextEncoder();
-        // ESP32に選択されたモードを送信
         await rxCharacteristic.writeValue(encoder.encode('START_MODE' + selectedModeNum));
       } catch (err) {
         console.error(err);
       }
     }
 
-    // ゲーム停止
     async function stopGame() {
       if (countdownTimer) clearInterval(countdownTimer);
       if (rxCharacteristic) {
@@ -263,23 +257,29 @@
       document.getElementById('statusText').innerText = 'READY';
     }
 
-    // ESP32からの通知受信用
+    // ESP32からの通知受信部
     function handleBLEData(event) {
       const decoder = new TextDecoder();
       const msg = decoder.decode(event.target.value).trim();
       console.log('受信:', msg);
 
-      // ① カウントダウン開始通知を受信したら JavaScript 側で順にカウントを実行
+      // ① カウントダウン開始通知を受信したら画面で 3 -> 2 -> 1 を順に表示
       if (msg === 'COUNTDOWN') {
         startSequenceCountdown();
       } 
-      // ② ヒット時
+      // ② ESP32がターゲットを実際に起こす「0」の瞬間に通知を受け取って「GO!!」と高音を発火
+      else if (msg === 'GAME_START') {
+        if (countdownTimer) clearInterval(countdownTimer);
+        document.getElementById('statusText').innerText = 'GO!!';
+        playBeep(880, 0.4); // 高音「ピー！」
+      }
+      // ③ ヒット時
       else if (msg.startsWith('HIT:')) {
         const score = msg.split(':')[1];
         document.getElementById('scoreText').innerText = 'SCORE: ' + score;
         playBeep(523, 0.1);
       } 
-      // ③ タイムアップ / クリア時
+      // ④ タイムアップ / クリア時
       else if (msg.startsWith('TIME_UP') || msg.startsWith('CLEAR:')) {
         if (countdownTimer) clearInterval(countdownTimer);
         document.getElementById('statusText').innerText = 'FINISH!';
@@ -287,7 +287,7 @@
       }
     }
 
-    // 画面の順次カウントダウン（3 ➔ 2 ➔ 1 ➔ GO!!）
+    // 画面のカウントダウン表示（3 ➔ 2 ➔ 1）
     function startSequenceCountdown() {
       if (countdownTimer) clearInterval(countdownTimer);
 
@@ -302,8 +302,7 @@
           playBeep(440, 0.15); // 「2」「1」の音
         } else {
           clearInterval(countdownTimer);
-          document.getElementById('statusText').innerText = 'GO!!';
-          playBeep(880, 0.4);  // 「GO!!」の音（起立タイミングと完全同期）
+          // 0（GO!!）の表示と発音は、ESP32からの「GAME_START」通知で確実に行われます
         }
       }, 1000);
     }
