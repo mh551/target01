@@ -33,7 +33,6 @@
       border: 1px solid #30d158;
     }
 
-    /* メイン表示パネル */
     .display-panel {
       width: 100%;
       max-width: 380px;
@@ -67,14 +66,7 @@
       font-family: monospace;
       margin-top: 5px;
     }
-    .log-box {
-      font-size: 0.8rem;
-      color: #888;
-      margin-top: 10px;
-      height: 1.2rem;
-    }
 
-    /* コントロールエリア */
     .control-panel {
       width: 100%;
       max-width: 380px;
@@ -83,7 +75,6 @@
       gap: 15px;
     }
 
-    /* モード選択エリア */
     .mode-select-group {
       display: flex;
       flex-direction: column;
@@ -106,7 +97,6 @@
     }
     .mode-title { font-weight: bold; font-size: 1.05rem; }
 
-    /* ボタン類 */
     button {
       width: 100%;
       padding: 16px;
@@ -132,7 +122,6 @@
     <div id="statusText" class="status-text">READY</div>
     <div id="timerText" class="timer-text">TIME: 0.0</div>
     <div id="scoreText" class="score-text">SCORE: 0</div>
-    <div id="logBox" class="log-box">受信ログ: -</div>
   </div>
 
   <div class="control-panel">
@@ -172,16 +161,15 @@
     let rxCharacteristic = null;
     let audioCtx = null;
     let selectedModeNum = 1;
+    let gameTimer = null;
+    let startTime = 0;
 
     function selectMode(modeNum) {
       selectedModeNum = modeNum;
       for (let i = 1; i <= 3; i++) {
         const label = document.getElementById('labelMode' + i);
-        if (i === modeNum) {
-          label.classList.add('selected');
-        } else {
-          label.classList.remove('selected');
-        }
+        if (i === modeNum) label.classList.add('selected');
+        else label.classList.remove('selected');
       }
     }
 
@@ -189,7 +177,6 @@
       try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         if (audioCtx.state === 'suspended') audioCtx.resume();
-
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
@@ -237,6 +224,8 @@
         alert('先にBluetooth機器を接続してください。');
         return;
       }
+      stopTimerUI();
+      document.getElementById('statusText').innerText = 'READY';
       document.getElementById('scoreText').innerText = 'SCORE: 0';
       document.getElementById('timerText').innerText = 'TIME: 0.0';
 
@@ -247,6 +236,7 @@
     }
 
     async function stopGame() {
+      stopTimerUI();
       if (rxCharacteristic) {
         const encoder = new TextEncoder();
         await rxCharacteristic.writeValue(encoder.encode('STOP'));
@@ -254,35 +244,54 @@
       document.getElementById('statusText').innerText = 'READY';
     }
 
+    function stopTimerUI() {
+      if (gameTimer) {
+        clearInterval(gameTimer);
+        gameTimer = null;
+      }
+    }
+
     // BLE受信データの処理
     function handleBLEData(event) {
       const decoder = new TextDecoder();
       const msg = decoder.decode(event.target.value).trim();
-      document.getElementById('logBox').innerText = '受信: ' + msg;
+      console.log('受信:', msg);
 
-      // カウントダウン (3, 2, 1)
+      // 1. カウントダウン (3, 2, 1)
       if (msg === '3' || msg === '2' || msg === '1') {
         document.getElementById('statusText').innerText = msg;
-        playBeep(440, 0.15); // 「ピッ」
+        playBeep(440, 0.15); // 低い「ピッ」
       } 
-      // GO!!
+      // 2. スタート (GO)
       else if (msg === 'GO' || msg === 'GAME_START') {
         document.getElementById('statusText').innerText = 'GO!!';
-        playBeep(880, 0.4); // 「ピー！」
+        playBeep(880, 0.4); // 高い「ピー！」
+        
+        // スマホ側でタイマーをカウントアップ開始
+        startTime = Date.now();
+        stopTimerUI();
+        gameTimer = setInterval(() => {
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          document.getElementById('timerText').innerText = 'TIME: ' + elapsed;
+        }, 100);
       } 
-      // タイマー更新 (例: T:12.3)
-      else if (msg.startsWith('T:')) {
-        const timeVal = msg.replace('T:', '');
-        document.getElementById('timerText').innerText = 'TIME: ' + timeVal;
-      } 
-      // ヒット (例: HIT:3)
+      // 3. ヒット (HIT:1など)
       else if (msg.startsWith('HIT:')) {
         const score = msg.split(':')[1];
         document.getElementById('scoreText').innerText = 'SCORE: ' + score;
         playBeep(523, 0.1);
       } 
-      // 終了
-      else if (msg.startsWith('TIME_UP') || msg.startsWith('CLEAR') || msg === 'FINISH') {
+      // 4. クリア（スピードクリアモード）
+      else if (msg.startsWith('CLEAR:')) {
+        stopTimerUI();
+        const clearTime = msg.split(':')[1];
+        document.getElementById('statusText').innerText = 'CLEAR!';
+        document.getElementById('timerText').innerText = 'TIME: ' + clearTime;
+        playBeep(1046, 0.6);
+      }
+      // 5. タイムアップ
+      else if (msg.startsWith('TIME_UP')) {
+        stopTimerUI();
         document.getElementById('statusText').innerText = 'FINISH!';
         playBeep(220, 0.5);
       }
