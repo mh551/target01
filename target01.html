@@ -53,11 +53,25 @@
       align-items: center;
       justify-content: center;
     }
+    .timer-text {
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #30d158;
+      font-family: monospace;
+      margin-top: 5px;
+    }
     .score-text {
-      font-size: 3.5rem;
-      font-weight: 900;
+      font-size: 2.2rem;
+      font-weight: bold;
       color: #ffffff;
       font-family: monospace;
+      margin-top: 5px;
+    }
+    .log-box {
+      font-size: 0.8rem;
+      color: #888;
+      margin-top: 10px;
+      height: 1.2rem;
     }
 
     /* コントロールエリア */
@@ -116,16 +130,16 @@
 
   <div class="display-panel">
     <div id="statusText" class="status-text">READY</div>
+    <div id="timerText" class="timer-text">TIME: 0.0</div>
     <div id="scoreText" class="score-text">SCORE: 0</div>
+    <div id="logBox" class="log-box">受信ログ: -</div>
   </div>
 
   <div class="control-panel">
-    <!-- Bluetooth接続ボタン -->
     <button id="btnConnect" class="btn-connect" onclick="connectBLE()">
       📲 Bluetooth 機器を接続
     </button>
 
-    <!-- モード選択グループ -->
     <div class="mode-select-group">
       <label class="mode-option selected" id="labelMode1">
         <input type="radio" name="gameMode" value="1" checked onchange="selectMode(1)">
@@ -141,7 +155,6 @@
       </label>
     </div>
 
-    <!-- スタートボタン -->
     <button class="btn-start" onclick="startGame()">
       ▶ スタート
     </button>
@@ -159,7 +172,6 @@
     let rxCharacteristic = null;
     let audioCtx = null;
     let selectedModeNum = 1;
-    let countdownTimer = null;
 
     function selectMode(modeNum) {
       selectedModeNum = modeNum;
@@ -175,12 +187,9 @@
 
     function playBeep(freq, duration) {
       try {
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume();
-        }
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = 'sine';
@@ -190,9 +199,7 @@
         gain.connect(audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + duration);
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) { console.error(e); }
     }
 
     async function connectBLE() {
@@ -206,7 +213,6 @@
         });
 
         document.getElementById('connectionStatus').innerText = '接続中...';
-
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
 
@@ -216,40 +222,31 @@
         await txCharacteristic.startNotifications();
         txCharacteristic.addEventListener('characteristicvaluechanged', handleBLEData);
 
-        document.getElementById('connectionStatus').innerText = '✅ 接続完了！スタートを押してください';
+        document.getElementById('connectionStatus').innerText = '✅ 接続完了！';
         document.getElementById('connectionStatus').classList.add('connected');
         document.getElementById('btnConnect').style.display = 'none';
 
       } catch (err) {
         console.error(err);
-        alert('接続できませんでした。ESP32の電源とBluetoothを確認してください。');
-        document.getElementById('connectionStatus').innerText = '接続失敗';
+        alert('接続に失敗しました。');
       }
     }
 
     async function startGame() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-
       if (!rxCharacteristic) {
-        alert('先に「Bluetooth 機器を接続」ボタンを押してください。');
+        alert('先にBluetooth機器を接続してください。');
         return;
       }
-
-      if (countdownTimer) clearInterval(countdownTimer);
-
       document.getElementById('scoreText').innerText = 'SCORE: 0';
+      document.getElementById('timerText').innerText = 'TIME: 0.0';
 
       try {
         const encoder = new TextEncoder();
         await rxCharacteristic.writeValue(encoder.encode('START_MODE' + selectedModeNum));
-      } catch (err) {
-        console.error(err);
-      }
+      } catch (err) { console.error(err); }
     }
 
     async function stopGame() {
-      if (countdownTimer) clearInterval(countdownTimer);
       if (rxCharacteristic) {
         const encoder = new TextEncoder();
         await rxCharacteristic.writeValue(encoder.encode('STOP'));
@@ -257,54 +254,38 @@
       document.getElementById('statusText').innerText = 'READY';
     }
 
-    // ESP32からの通知受信部
+    // BLE受信データの処理
     function handleBLEData(event) {
       const decoder = new TextDecoder();
       const msg = decoder.decode(event.target.value).trim();
-      console.log('受信:', msg);
+      document.getElementById('logBox').innerText = '受信: ' + msg;
 
-      // ① カウントダウン開始通知を受信したら画面で 3 -> 2 -> 1 を順に表示
-      if (msg === 'COUNTDOWN') {
-        startSequenceCountdown();
+      // カウントダウン (3, 2, 1)
+      if (msg === '3' || msg === '2' || msg === '1') {
+        document.getElementById('statusText').innerText = msg;
+        playBeep(440, 0.15); // 「ピッ」
       } 
-      // ② ESP32がターゲットを実際に起こす「0」の瞬間に通知を受け取って「GO!!」と高音を発火
-      else if (msg === 'GAME_START') {
-        if (countdownTimer) clearInterval(countdownTimer);
+      // GO!!
+      else if (msg === 'GO' || msg === 'GAME_START') {
         document.getElementById('statusText').innerText = 'GO!!';
-        playBeep(880, 0.4); // 高音「ピー！」
-      }
-      // ③ ヒット時
+        playBeep(880, 0.4); // 「ピー！」
+      } 
+      // タイマー更新 (例: T:12.3)
+      else if (msg.startsWith('T:')) {
+        const timeVal = msg.replace('T:', '');
+        document.getElementById('timerText').innerText = 'TIME: ' + timeVal;
+      } 
+      // ヒット (例: HIT:3)
       else if (msg.startsWith('HIT:')) {
         const score = msg.split(':')[1];
         document.getElementById('scoreText').innerText = 'SCORE: ' + score;
         playBeep(523, 0.1);
       } 
-      // ④ タイムアップ / クリア時
-      else if (msg.startsWith('TIME_UP') || msg.startsWith('CLEAR:')) {
-        if (countdownTimer) clearInterval(countdownTimer);
+      // 終了
+      else if (msg.startsWith('TIME_UP') || msg.startsWith('CLEAR') || msg === 'FINISH') {
         document.getElementById('statusText').innerText = 'FINISH!';
         playBeep(220, 0.5);
       }
-    }
-
-    // 画面のカウントダウン表示（3 ➔ 2 ➔ 1）
-    function startSequenceCountdown() {
-      if (countdownTimer) clearInterval(countdownTimer);
-
-      let count = 3;
-      document.getElementById('statusText').innerText = count;
-      playBeep(440, 0.15); // 「3」の音
-
-      countdownTimer = setInterval(() => {
-        count--;
-        if (count > 0) {
-          document.getElementById('statusText').innerText = count;
-          playBeep(440, 0.15); // 「2」「1」の音
-        } else {
-          clearInterval(countdownTimer);
-          // 0（GO!!）の表示と発音は、ESP32からの「GAME_START」通知で確実に行われます
-        }
-      }, 1000);
     }
   </script>
 </body>
