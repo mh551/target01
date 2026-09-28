@@ -2,326 +2,839 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ターゲットシューティング</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ダーツターゲットコントローラー</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #121214;
-      color: #ffffff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px 15px;
-      min-height: 100vh;
+      padding: 12px;
+      background-color: #f0f2f5;
+      color: #333;
+      margin: 0;
     }
-    h1 { font-size: 1.4rem; color: #aaaaaa; margin-bottom: 10px; }
-    
-    .status-badge {
-      padding: 6px 16px;
-      border-radius: 20px;
-      font-size: 0.9rem;
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 12px;
+    }
+    h2 { margin-top: 0; color: #1a73e8; font-size: 1.1rem; }
+    .btn {
+      background-color: #007aff;
+      color: white;
+      border: none;
+      padding: 14px 16px;
+      font-size: 18px;
       font-weight: bold;
-      background-color: #333336;
-      color: #ffcc00;
-      margin-bottom: 15px;
-    }
-    .status-badge.connected {
-      background-color: #1b3a24;
-      color: #30d158;
-      border: 1px solid #30d158;
-    }
-    .status-badge.disconnected {
-      background-color: #3a1b1b;
-      color: #ff453a;
-      border: 1px solid #ff453a;
-    }
-
-    .display-panel {
+      border-radius: 8px;
+      cursor: pointer;
       width: 100%;
-      max-width: 380px;
-      background: #1c1c1e;
-      border-radius: 16px;
-      padding: 20px;
-      text-align: center;
-      border: 1px solid #2c2c2e;
-      margin-bottom: 20px;
+      margin-top: 5px;
     }
-    .status-text {
-      font-size: 3.5rem;
+    .btn:active { background-color: #0056b3; }
+    .btn-secondary { background-color: #8e8e93; }
+    .btn-warning { background-color: #ff9500; }
+    
+    /* ⚠️ MISSボタン（大型表示） */
+    .btn-danger-large { 
+      background-color: #ff3b30;
+      color: white;
+      border: none;
+      height: 100px;
+      font-size: 24px;
       font-weight: 900;
-      color: #ffd60a;
-      min-height: 4.5rem;
+      border-radius: 12px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      box-shadow: 0 4px 10px rgba(255, 59, 48, 0.3);
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    .timer-text {
-      font-size: 2.2rem;
-      font-weight: bold;
-      color: #30d158;
-      font-family: monospace;
-      margin-top: 5px;
-    }
-    .score-text {
-      font-size: 2.2rem;
-      font-weight: bold;
-      color: #ffffff;
-      font-family: monospace;
-      margin-top: 5px;
+    .btn-danger-large:active {
+      background-color: #c70000;
+      transform: scale(0.98);
     }
 
-    .control-panel {
-      width: 100%;
-      max-width: 380px;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
+    .radio-group { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+    .radio-label { display: flex; align-items: center; font-size: 15px; cursor: pointer; }
+    .radio-label input { margin-right: 8px; transform: scale(1.2); }
+    .desc-box {
+      background-color: #eef3fc;
+      border-left: 4px solid #007aff;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.5;
+      border-radius: 4px;
+      margin-top: 10px;
     }
+    input[type="text"], input[type="number"], select {
+      font-size: 16px;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    .player-inputs { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .player-row { display: flex; align-items: center; gap: 10px; }
 
-    .mode-select-group {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .mode-option {
-      display: flex;
+    /* ⏱️ 全画面カウントダウン */
+    #countdownOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.95);
+      color: #ff3b30;
+      font-size: 80px;
+      font-weight: 900;
+      justify-content: center;
       align-items: center;
-      background: #2c2c2e;
-      padding: 14px;
-      border-radius: 12px;
-      cursor: pointer;
-      border: 2px solid transparent;
-      transition: all 0.2s;
+      flex-direction: column;
+      z-index: 9999;
+      letter-spacing: 2px;
+      text-align: center;
     }
-    .mode-option input { display: none; }
-    .mode-option.selected {
-      border-color: #0a84ff;
-      background: #1a2a3a;
+    #countPlayerTitle {
+      font-size: 28px;
+      color: #34c759;
+      margin-bottom: 20px;
     }
-    .mode-title { font-weight: bold; font-size: 1.05rem; }
 
-    button {
-      width: 100%;
-      padding: 16px;
-      font-size: 1.2rem;
-      font-weight: bold;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
+    /* 🎯 プレイ画面 */
+    #gameScreen { display: none; }
+    .score-board {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
     }
-    button:active { transform: scale(0.98); }
-    
-    .btn-connect { background-color: #0a84ff; color: #ffffff; }
-    .btn-start { background-color: #30d158; color: #000000; }
-    .btn-stop { background-color: #ff453a; color: #ffffff; }
+    .player-card {
+      background: #f8f9fa;
+      border: 3px solid #ddd;
+      border-radius: 12px;
+      padding: 10px 6px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    .player-card.active {
+      border-color: #007aff;
+      background: #eef6ff;
+      box-shadow: 0 0 12px rgba(0, 122, 255, 0.4);
+      transform: scale(1.02);
+    }
+    .p-name { font-size: 1rem; font-weight: bold; color: #333; margin-bottom: 4px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+    .p-score { font-size: 1.8rem; font-weight: bold; color: #1a73e8; margin: 4px 0; }
+    .p-sub { font-size: 0.75rem; color: #666; }
+
+    .game-status-bar {
+      background: #333;
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* 🎯 もぐらたたきターゲット指示画面 */
+    .target-display {
+      background: #111;
+      color: #00ffcc;
+      font-size: 2.2rem;
+      font-weight: 900;
+      text-align: center;
+      padding: 15px;
+      border-radius: 12px;
+      margin: 10px 0;
+      border: 3px solid #00ffcc;
+      box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+    }
+
+    /* 📌 固定表示の判定ディスプレイ */
+    .hit-pop {
+      background: #e9ecef;
+      color: #495057;
+      font-size: 1.3rem;
+      font-weight: bold;
+      text-align: center;
+      padding: 14px;
+      border-radius: 10px;
+      margin: 10px 0;
+      border: 2px solid #ced4da;
+      transition: all 0.2s ease;
+    }
+    .hit-pop.hit-style {
+      background: #fff3cd;
+      color: #856404;
+      border-color: #ffeeba;
+    }
+    .hit-pop.miss-style {
+      background: #e2e3e5;
+      color: #383d41;
+      border-color: #d6d8db;
+    }
+
+    /* 🔄 交代スタート待機ボックス */
+    .change-turn-box {
+      background: #fff3cd;
+      border: 2px solid #ffeeba;
+      border-radius: 12px;
+      padding: 15px;
+      text-align: center;
+      margin: 12px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* 📊 履歴 */
+    .history-list {
+      list-style: none; padding: 0; margin: 0;
+      max-height: 180px; overflow-y: auto;
+      border: 1px solid #ddd; border-radius: 8px; background: #fafafa;
+    }
+    .history-item {
+      padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .history-item.round-end { background-color: #e3f2fd; font-weight: bold; color: #0d47a1; }
+    .history-item.game-end { background-color: #e8f5e9; font-weight: bold; color: #1b5e20; }
+    .history-item.extra-round { background-color: #ffebee; font-weight: bold; color: #c62828; }
+    .badge { background: #007aff; color: white; padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 15px;
+    }
   </style>
 </head>
 <body>
 
-  <h1>TARGET SHOOTING</h1>
-  <div id="connectionStatus" class="status-badge">① まずBluetooth接続してください</div>
-
-  <div class="display-panel">
-    <div id="statusText" class="status-text">READY</div>
-    <div id="timerText" class="timer-text">TIME: 0.0</div>
-    <div id="scoreText" class="score-text">SCORE: 0</div>
+  <!-- カウントダウン画面オーバレイ -->
+  <div id="countdownOverlay">
+    <div id="countPlayerTitle">Next Player</div>
+    <div id="countNum">3</div>
   </div>
 
-  <div class="control-panel">
-    <button id="btnConnect" class="btn-connect" onclick="connectBLE()">
-      📲 Bluetooth 機器を接続
-    </button>
+  <!-- ---------------- 1. 設定画面 ---------------- -->
+  <div id="setupScreen">
+    <h1>🎯 ダーツボード設定</h1>
 
-    <div class="mode-select-group">
-      <label class="mode-option selected" id="labelMode1">
-        <input type="radio" name="gameMode" value="1" checked onchange="selectMode(1)">
-        <span class="mode-title">⏱️ 1. タイムアタック</span>
-      </label>
-      <label class="mode-option" id="labelMode2">
-        <input type="radio" name="gameMode" value="2" onchange="selectMode(2)">
-        <span class="mode-title">⚡ 2. スピードクリア</span>
-      </label>
-      <label class="mode-option" id="labelMode3">
-        <input type="radio" name="gameMode" value="3" onchange="selectMode(3)">
-        <span class="mode-title">👾 3. モグラたたき</span>
-      </label>
+    <div class="card">
+      <h2>1. ESP32接続</h2>
+      <button class="btn" onclick="connectBLE()">Bluetooth 接続開始</button>
+      <p id="status" style="margin-top:8px; font-weight:bold; color:red;">未接続</p>
     </div>
 
-    <button class="btn-start" onclick="startGame()">
-      ▶ スタート
-    </button>
+    <div class="card">
+      <h2>2. プレイヤー登録</h2>
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <label style="font-weight:bold;">人数選択:</label>
+        <select id="playerCountSelect" onchange="renderPlayerInputs()">
+          <option value="1">1人</option>
+          <option value="2" selected>2人</option>
+          <option value="3">3人</option>
+          <option value="4">4人</option>
+          <option value="5">5人</option>
+        </select>
+      </div>
+      <div class="player-inputs" id="playerInputsContainer">
+        <!-- JSで動的生成 -->
+      </div>
+    </div>
 
-    <button class="btn-stop" onclick="stopGame()">
-      ⏹ 中断 / リセット
-    </button>
+    <div class="card">
+      <h2>3. ゲームモード選択</h2>
+      <div class="radio-group">
+        <label class="radio-label">
+          <input type="radio" name="gameMode" value="TIME_ATTACK" checked onchange="updateModeDescription()">
+          モード1: タイムアタック (制限時間内スコア競う)
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="gameMode" value="SPEED_ATTACK" onchange="updateModeDescription()">
+          モード2: スピードアタック (規定枚数クリアのタイム競う)
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="gameMode" value="MOLE_HIT" onchange="updateModeDescription()">
+          モード3: もぐらたたき (指定されたターゲットを射撃)
+        </label>
+      </div>
+      <div id="modeDescription" class="desc-box"></div>
+    </div>
+
+    <div class="card">
+      <h2>4. モード別詳細設定</h2>
+      <div id="modeSettingsContainer">
+        <!-- モード選択に応じて動的に変化 -->
+      </div>
+    </div>
+
+    <div class="card">
+      <button class="btn" style="background-color: #34c759;" onclick="startWithCountdown(true)">ゲームスタート！</button>
+    </div>
   </div>
 
+
+  <!-- ---------------- 2. ゲームプレイ画面 ---------------- -->
+  <div id="gameScreen">
+    <div class="game-status-bar">
+      <span id="displayModeTitle">タイムアタック</span>
+      <span id="displayTimer" style="font-size: 1.4rem; color: #ffcc00;">⏱️ 00.0秒</span>
+    </div>
+
+    <!-- もぐらたたき用 ターゲット指定表示エリア -->
+    <div id="moleTargetDisplay" class="target-display" style="display: none;">
+      🎯 ターゲット: <span id="currentTargetNum">1</span> 番を狙え！
+    </div>
+
+    <!-- スコア表示パネル -->
+    <div class="score-board" id="scoreBoardContainer"></div>
+
+    <!-- 📌 最新の投球結果（常時固定表示エリア） -->
+    <div id="hitPop" class="hit-pop">直近の判定: 待機中...</div>
+
+    <!-- 🔄 プレイヤー交代時のスタートボックス -->
+    <div id="turnStartBox" class="change-turn-box" style="display:none;">
+      <p style="margin: 0 0 10px 0; font-weight: bold; font-size: 1.2rem; color: #856404;" id="nextPlayerAlert">次は Player2 のターンです</p>
+      <button class="btn btn-warning" style="font-size: 20px; padding: 16px;" onclick="startNextTurnCountdown()">▶️ 次のプレイヤー スタート！</button>
+    </div>
+
+    <!-- 📊 スコア履歴 -->
+    <div class="card" style="margin-top: 12px;">
+      <h2 style="margin-bottom: 8px;">📊 プレイログ</h2>
+      <ul id="historyList" class="history-list">
+        <li class="history-item" style="color: #888;">投球データ待機中...</li>
+      </ul>
+    </div>
+
+    <!-- 操作ボタンエリア -->
+    <div class="action-buttons">
+      <!-- ⚠️ MISS（パス）ボタン -->
+      <button id="missBtn" class="btn-danger-large" onclick="processMissShot()">💨 MISS / スキップ</button>
+      <!-- 設定画面へ戻るボタン -->
+      <button class="btn btn-secondary" onclick="exitGame()">設定画面へ戻る</button>
+    </div>
+  </div>
+
+
   <script>
-    const SERVICE_UUID           = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
-    const CHARACTERISTIC_UUID_RX = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
-    const CHARACTERISTIC_UUID_TX = '8260c02c-502a-466d-a19e-e31448b1116b';
+    const SERVICE_UUID        = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+    const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
-    let bluetoothDevice = null;
-    let rxCharacteristic = null;
+    let bluetoothDevice;
+    let characteristic;
     let audioCtx = null;
-    let selectedModeNum = 1;
     let gameTimer = null;
-    let startTime = 0;
+    let timerStartTime = 0;
 
-    function selectMode(modeNum) {
-      selectedModeNum = modeNum;
-      for (let i = 1; i <= 3; i++) {
-        const label = document.getElementById('labelMode' + i);
-        if (i === modeNum) label.classList.add('selected');
-        else label.classList.remove('selected');
+    let gameState = {
+      players: [],        
+      currentTurnIdx: 0,  
+      mode: "TIME_ATTACK",
+      // 設定値
+      timeLimit: 30,      // タイムアタック制限時間(秒)
+      targetHitCount: 10, // スピードアタック目標枚数
+      moleCount: 10,      // もぐらたたき目標数
+      // プレイ中状態
+      remainingTime: 0,
+      elapsedTime: 0,
+      currentMoleTarget: 1, // もぐらたたきで狙うべきID (1〜4)
+      hitsInTurn: 0,
+      isGameRunning: false
+    };
+
+    const modeDescriptions = {
+      "TIME_ATTACK": "<b>【タイムアタック】</b><br>制限時間内に何点取れるかを競います。命中するとターゲットは自動復元します。",
+      "SPEED_ATTACK": "<b>【スピードアタック】</b><br>規定枚数のターゲットを倒しきるまでのタイム（秒）を競います。短い方が勝ちです。",
+      "MOLE_HIT": "<b>【もぐらたたき】</b><br>画面に指定されたターゲット番号に当たると得点！規定数をクリアするまでのタイムを競います。"
+    };
+
+    const modeNames = {
+      "TIME_ATTACK": "タイムアタック",
+      "SPEED_ATTACK": "スピードアタック",
+      "MOLE_HIT": "もぐらたたき"
+    };
+
+    window.onload = function() {
+      renderPlayerInputs();
+      updateModeDescription();
+    };
+
+    function renderPlayerInputs() {
+      const count = parseInt(document.getElementById("playerCountSelect").value, 10);
+      const container = document.getElementById("playerInputsContainer");
+      container.innerHTML = "";
+
+      for (let i = 1; i <= count; i++) {
+        const row = document.createElement("div");
+        row.className = "player-row";
+        row.innerHTML = `
+          <label style="width: 80px; font-weight:bold;">P${i}名前:</label>
+          <input type="text" id="p${i}Name" value="Player${i}" style="flex:1;">
+        `;
+        container.appendChild(row);
       }
     }
 
-    function playBeep(freq, duration) {
+    // 🔊 ブザー音再生
+    function playRealBuzzer(duration, isLong = false) {
       try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-      } catch (e) { console.error(e); }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        const now = audioCtx.currentTime;
+        const freqs = isLong ? [120, 243, 365, 487] : [150, 305, 460];
+        
+        freqs.forEach((freq) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc.type = (freq % 2 === 0) ? 'square' : 'sawtooth';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.setValueAtTime(freq + (Math.random() * 10 - 5), now + 0.05);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.setValueAtTime(0.4, now + duration - 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+          osc.start(now);
+          osc.stop(now + duration);
+        });
+      } catch (e) {
+        console.log("Audio Error: " + e);
+      }
+    }
+
+    function updateModeDescription() {
+      const selectedMode = document.querySelector('input[name="gameMode"]:checked').value;
+      document.getElementById("modeDescription").innerHTML = modeDescriptions[selectedMode];
+      
+      const settingsContainer = document.getElementById("modeSettingsContainer");
+      if (selectedMode === "TIME_ATTACK") {
+        settingsContainer.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="font-weight:bold;">制限時間:</label>
+            <input type="number" id="timeLimitInput" value="30" min="5" max="180" style="width:80px;"> 秒
+          </div>
+        `;
+      } else if (selectedMode === "SPEED_ATTACK") {
+        settingsContainer.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="font-weight:bold;">目標クリア撃破数:</label>
+            <input type="number" id="targetCountInput" value="10" min="1" max="50" style="width:80px;"> 枚
+          </div>
+        `;
+      } else if (selectedMode === "MOLE_HIT") {
+        settingsContainer.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <label style="font-weight:bold;">目標撃破数:</label>
+            <input type="number" id="moleCountInput" value="10" min="1" max="30" style="width:80px;"> 回
+          </div>
+        `;
+      }
     }
 
     async function connectBLE() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') await audioCtx.resume();
-
       try {
         bluetoothDevice = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
+          filters: [{ name: 'DartsTarget_ESP32' }],
           optionalServices: [SERVICE_UUID]
         });
-
-        // 切断イベントの自動ハンドリング登録
-        bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
-
-        document.getElementById('connectionStatus').innerText = '接続中...';
         const server = await bluetoothDevice.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
+        characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
 
-        rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_RX);
-        const txCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_TX);
+        await characteristic.startNotifications();
+        characteristic.addEventListener('characteristicvaluechanged', handleNotify);
 
-        await txCharacteristic.startNotifications();
-        txCharacteristic.addEventListener('characteristicvaluechanged', handleBLEData);
-
-        const statusBadge = document.getElementById('connectionStatus');
-        statusBadge.innerText = '✅ 接続完了！';
-        statusBadge.className = 'status-badge connected';
-        document.getElementById('btnConnect').style.display = 'none';
-
-      } catch (err) {
-        console.error(err);
-        alert('接続に失敗しました。');
-        resetConnectionUI('❌ 接続失敗');
+        document.getElementById("status").innerText = "接続完了！";
+        document.getElementById("status").style.color = "green";
+      } catch (error) {
+        alert("接続エラー: " + error);
       }
     }
 
-    // 切断されたときの自動復帰処理
-    function onDisconnected(event) {
-      console.log('Bluetooth切断検出');
-      stopTimerUI();
-      rxCharacteristic = null;
-      resetConnectionUI('⚠️ 切断されました（再接続してください）');
-    }
-
-    function resetConnectionUI(msg) {
-      const statusBadge = document.getElementById('connectionStatus');
-      statusBadge.innerText = msg;
-      statusBadge.className = 'status-badge disconnected';
-      
-      const btnConnect = document.getElementById('btnConnect');
-      btnConnect.style.display = 'block';
-      btnConnect.innerText = '🔄 Bluetooth 再接続';
-    }
-
-    async function startGame() {
-      if (!rxCharacteristic) {
-        alert('Bluetoothが切断されています。再接続してください。');
+    function startWithCountdown(isInitialStart = false, callback = null) {
+      if (isInitialStart && !characteristic) {
+        alert("先にBluetooth接続を行ってください。");
         return;
       }
-      stopTimerUI();
-      document.getElementById('statusText').innerText = 'READY';
-      document.getElementById('scoreText').innerText = 'SCORE: 0';
-      document.getElementById('timerText').innerText = 'TIME: 0.0';
 
-      try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtx.resume();
+
+      const overlay = document.getElementById("countdownOverlay");
+      const countNum = document.getElementById("countNum");
+      const title = document.getElementById("countPlayerTitle");
+
+      let nextPlayerName = "Player1";
+      if (isInitialStart) {
+        const p1Val = document.getElementById("p1Name") ? document.getElementById("p1Name").value.trim() : "Player1";
+        nextPlayerName = p1Val || "Player1";
+      } else {
+        nextPlayerName = gameState.players[gameState.currentTurnIdx].name;
+      }
+
+      title.innerText = isInitialStart ? `🎯 ${nextPlayerName} のターン` : `🔄 交代: ${nextPlayerName} のターン`;
+      overlay.style.display = "flex";
+
+      let count = 3;
+      countNum.innerText = count;
+      playRealBuzzer(0.2, false);
+
+      const timer = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countNum.innerText = count;
+          playRealBuzzer(0.2, false);
+        } else if (count === 0) {
+          countNum.innerText = "START!";
+          playRealBuzzer(0.9, true);
+        } else {
+          clearInterval(timer);
+          overlay.style.display = "none";
+          
+          if (isInitialStart) {
+            document.getElementById("setupScreen").style.display = "none";
+            document.getElementById("gameScreen").style.display = "block";
+            applyAndStart();
+          } else if (callback) {
+            callback();
+          }
+        }
+      }, 1000);
+    }
+
+    async function applyAndStart() {
+      const count = parseInt(document.getElementById("playerCountSelect").value, 10);
+      gameState.players = [];
+
+      for (let i = 1; i <= count; i++) {
+        const inputElem = document.getElementById(`p${i}Name`);
+        const nameVal = inputElem ? inputElem.value.trim() : `Player${i}`;
+        gameState.players.push({
+          name: nameVal || `Player${i}`,
+          score: 0,
+          time: 0,
+          hits: 0
+        });
+      }
+
+      gameState.mode = document.querySelector('input[name="gameMode"]:checked').value;
+      if (gameState.mode === "TIME_ATTACK") {
+        gameState.timeLimit = parseInt(document.getElementById("timeLimitInput").value, 10) || 30;
+      } else if (gameState.mode === "SPEED_ATTACK") {
+        gameState.targetHitCount = parseInt(document.getElementById("targetCountInput").value, 10) || 10;
+      } else if (gameState.mode === "MOLE_HIT") {
+        gameState.moleCount = parseInt(document.getElementById("moleCountInput").value, 10) || 10;
+      }
+
+      gameState.currentTurnIdx = 0;
+      document.getElementById("turnStartBox").style.display = "none";
+      document.getElementById("missBtn").style.display = "flex";
+      
+      initUIBoard();
+      clearHistory();
+      showHitPop("直近の判定: 待機中...", "none");
+
+      startTurn();
+    }
+
+    function initUIBoard() {
+      const container = document.getElementById("scoreBoardContainer");
+      container.innerHTML = "";
+
+      gameState.players.forEach((p, idx) => {
+        const card = document.createElement("div");
+        card.id = `pCard_${idx}`;
+        card.className = `player-card ${idx === 0 ? 'active' : ''}`;
+        card.innerHTML = `
+          <div class="p-name" id="pName_${idx}">${p.name}</div>
+          <div class="p-score" id="pScore_${idx}">0</div>
+          <div class="p-sub" id="pSub_${idx}">-</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function startTurn() {
+      gameState.hitsInTurn = 0;
+      gameState.isGameRunning = true;
+      
+      // UI設定
+      document.getElementById("moleTargetDisplay").style.display = (gameState.mode === "MOLE_HIT") ? "block" : "none";
+      if (gameState.mode === "MOLE_HIT") {
+        setNextMoleTarget();
+      }
+
+      updateUIBoard();
+      startTimerLogic();
+
+      // ESP32へモード変更コマンド送信
+      if (characteristic) {
         const encoder = new TextEncoder();
-        await rxCharacteristic.writeValue(encoder.encode('START_MODE' + selectedModeNum));
-      } catch (err) { 
-        console.error('送信エラー:', err);
-        alert('送信に失敗しました。再接続をお試しください。');
+        characteristic.writeValue(encoder.encode("SET_MODE:" + gameState.mode));
+        characteristic.writeValue(encoder.encode("SHOT_START"));
+      }
+
+      const activePlayer = gameState.players[gameState.currentTurnIdx];
+      addHistoryItem(`▶️ ターン開始: <b>${activePlayer.name}</b>`, "round-end");
+    }
+
+    function setNextMoleTarget() {
+      gameState.currentMoleTarget = Math.floor(Math.random() * 4) + 1; // 1〜4番ランダム
+      document.getElementById("currentTargetNum").innerText = gameState.currentMoleTarget;
+    }
+
+    function startTimerLogic() {
+      if (gameTimer) clearInterval(gameTimer);
+      timerStartTime = Date.now();
+
+      gameTimer = setInterval(() => {
+        if (!gameState.isGameRunning) return;
+
+        const now = Date.now();
+        const elapsedSec = (now - timerStartTime) / 1000;
+
+        if (gameState.mode === "TIME_ATTACK") {
+          const remaining = Math.max(0, gameState.timeLimit - elapsedSec);
+          document.getElementById("displayTimer").innerText = `⏱️ ${remaining.toFixed(1)}秒`;
+
+          if (remaining <= 0) {
+            endTurn(false, "タイムアップ！");
+          }
+        } else {
+          // SPEED_ATTACK または MOLE_HIT（経過時間を測定）
+          document.getElementById("displayTimer").innerText = `⏱️ ${elapsedSec.toFixed(1)}秒`;
+        }
+      }, 100);
+    }
+
+    function updateUIBoard() {
+      document.getElementById("displayModeTitle").innerText = modeNames[gameState.mode];
+
+      gameState.players.forEach((p, idx) => {
+        const card = document.getElementById(`pCard_${idx}`);
+        const scoreElem = document.getElementById(`pScore_${idx}`);
+        const subElem = document.getElementById(`pSub_${idx}`);
+
+        if (card) {
+          if (idx === gameState.currentTurnIdx) {
+            card.classList.add("active");
+          } else {
+            card.classList.remove("active");
+          }
+        }
+
+        if (gameState.mode === "TIME_ATTACK") {
+          if (scoreElem) scoreElem.innerText = p.score + "点";
+          if (subElem) subElem.innerText = `命中: ${p.hits}回`;
+        } else if (gameState.mode === "SPEED_ATTACK") {
+          if (scoreElem) scoreElem.innerText = p.time > 0 ? p.time.toFixed(2) + "秒" : "--";
+          if (subElem) subElem.innerText = `残り: ${Math.max(0, gameState.targetHitCount - p.hits)}枚`;
+        } else if (gameState.mode === "MOLE_HIT") {
+          if (scoreElem) scoreElem.innerText = p.time > 0 ? p.time.toFixed(2) + "秒" : "--";
+          if (subElem) subElem.innerText = `クリア: ${p.hits} / ${gameState.moleCount}`;
+        }
+      });
+    }
+
+    // 📌 判定表示＋効果音
+    function showHitPop(text, type = "hit") {
+      const pop = document.getElementById("hitPop");
+      pop.innerText = text;
+
+      pop.classList.remove("hit-style", "miss-style");
+
+      if (type === "hit") {
+        pop.classList.add("hit-style");
+        playRealBuzzer(0.15, false);
+      } else if (type === "miss") {
+        pop.classList.add("miss-style");
+        playRealBuzzer(0.3, true);
       }
     }
 
-    async function stopGame() {
-      stopTimerUI();
-      if (rxCharacteristic) {
-        try {
-          const encoder = new TextEncoder();
-          await rxCharacteristic.writeValue(encoder.encode('STOP'));
-        } catch (e) { console.error(e); }
-      }
-      document.getElementById('statusText').innerText = 'READY';
-    }
+    // 📡 ESP32からの通知受信用ロジック
+    function handleNotify(event) {
+      if (!gameState.isGameRunning) return;
 
-    function stopTimerUI() {
-      if (gameTimer) {
-        clearInterval(gameTimer);
-        gameTimer = null;
-      }
-    }
+      const value = new TextDecoder().decode(event.target.value).trim();
+      console.log("ESP32受信:", value);
 
-    function handleBLEData(event) {
-      const decoder = new TextDecoder();
-      const msg = decoder.decode(event.target.value).trim();
-      console.log('受信:', msg);
-
-      if (msg === '3' || msg === '2' || msg === '1') {
-        document.getElementById('statusText').innerText = msg;
-        playBeep(440, 0.15);
-      } 
-      else if (msg === 'GO' || msg === 'GAME_START') {
-        document.getElementById('statusText').innerText = 'GO!!';
-        playBeep(880, 0.4);
+      if (value.includes("HIT:")) {
+        // 例: HIT:1 または HIT:1|+:50
+        const activePlayer = gameState.players[gameState.currentTurnIdx];
         
-        startTime = Date.now();
-        stopTimerUI();
-        gameTimer = setInterval(() => {
-          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-          document.getElementById('timerText').innerText = 'TIME: ' + elapsed;
-        }, 100);
-      } 
-      else if (msg.startsWith('HIT:')) {
-        const score = msg.split(':')[1];
-        document.getElementById('scoreText').innerText = 'SCORE: ' + score;
-        playBeep(523, 0.1);
-      } 
-      else if (msg.startsWith('CLEAR:')) {
-        stopTimerUI();
-        const clearTime = msg.split(':')[1];
-        document.getElementById('statusText').innerText = 'CLEAR!';
-        document.getElementById('timerText').innerText = 'TIME: ' + clearTime;
-        playBeep(1046, 0.6);
+        let targetId = 0;
+        let points = 10;
+
+        const parts = value.split("|");
+        targetId = parseInt(parts[0].replace("HIT:", "").trim(), 10) || 0;
+        
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i].includes("+:")) {
+            points = parseInt(parts[i].replace("+:", "").trim(), 10) || 10;
+          }
+        }
+
+        if (gameState.mode === "TIME_ATTACK") {
+          activePlayer.score += points;
+          activePlayer.hits++;
+          showHitPop(`🎯 ${activePlayer.name}: 命中! (+${points}点)`, "hit");
+          addHistoryItem(`🎯 <b>${activePlayer.name}</b>: Target ${targetId} 命中 (+${points}点)`);
+
+        } else if (gameState.mode === "SPEED_ATTACK") {
+          activePlayer.hits++;
+          showHitPop(`⚡ ${activePlayer.name}: 命中! (残り${gameState.targetHitCount - activePlayer.hits}枚)`, "hit");
+          addHistoryItem(`⚡ <b>${activePlayer.name}</b>: 撃破 (${activePlayer.hits}/${gameState.targetHitCount})`);
+
+          if (activePlayer.hits >= gameState.targetHitCount) {
+            const finalTime = (Date.now() - timerStartTime) / 1000;
+            activePlayer.time = finalTime;
+            endTurn(true, `全クリア！ タイム: ${finalTime.toFixed(2)}秒`);
+          }
+
+        } else if (gameState.mode === "MOLE_HIT") {
+          if (targetId === gameState.currentMoleTarget) {
+            activePlayer.hits++;
+            showHitPop(`🔨 HIT! 正解ターゲット撃破!`, "hit");
+            addHistoryItem(`🔨 <b>${activePlayer.name}</b>: Target ${targetId} 撃破! (${activePlayer.hits}/${gameState.moleCount})`);
+
+            if (activePlayer.hits >= gameState.moleCount) {
+              const finalTime = (Date.now() - timerStartTime) / 1000;
+              activePlayer.time = finalTime;
+              endTurn(true, `全クリア！ タイム: ${finalTime.toFixed(2)}秒`);
+            } else {
+              setNextMoleTarget();
+            }
+          } else {
+            showHitPop(`❌ 違うターゲット！ (${targetId}番)`, "miss");
+          }
+        }
+
+        updateUIBoard();
       }
-      else if (msg.startsWith('TIME_UP')) {
-        stopTimerUI();
-        document.getElementById('statusText').innerText = 'FINISH!';
-        playBeep(220, 0.5);
+    }
+
+    // ⚠️ MISSボタン処理
+    function processMissShot() {
+      if (!gameState.isGameRunning) return;
+      const activePlayer = gameState.players[gameState.currentTurnIdx];
+      showHitPop(`💨 ${activePlayer.name}: MISS / パス`, "miss");
+      addHistoryItem(`💨 <b>${activePlayer.name}</b>: MISS`, "normal");
+    }
+
+    function endTurn(isClear = false, message = "") {
+      gameState.isGameRunning = false;
+      clearInterval(gameTimer);
+
+      const activePlayer = gameState.players[gameState.currentTurnIdx];
+      
+      if (message) {
+        showHitPop(message, isClear ? "hit" : "miss");
       }
+
+      // 次のプレイヤー判定またはゲーム終了判定
+      if (gameState.currentTurnIdx < gameState.players.length - 1) {
+        prepareForNextTurn();
+      } else {
+        triggerGameOver();
+      }
+    }
+
+    function prepareForNextTurn() {
+      gameState.currentTurnIdx++;
+      const nextPlayerName = gameState.players[gameState.currentTurnIdx].name;
+      
+      document.getElementById("nextPlayerAlert").innerText = `次は ${nextPlayerName} のターンです`;
+      document.getElementById("turnStartBox").style.display = "block";
+      document.getElementById("missBtn").style.display = "none";
+
+      addHistoryItem(`⏸️ <b>${nextPlayerName}</b> の交代準備完了`, "round-end");
+    }
+
+    function startNextTurnCountdown() {
+      document.getElementById("turnStartBox").style.display = "none";
+      document.getElementById("missBtn").style.display = "flex";
+
+      startWithCountdown(false, () => {
+        startTurn();
+      });
+    }
+
+    // 🎉 ゲームセット共通処理
+    function triggerGameOver() {
+      playRealBuzzer(0.8, true);
+
+      let winnerText = "";
+      let resultDetail = "";
+
+      if (gameState.mode === "TIME_ATTACK") {
+        let maxScore = -1;
+        let winners = [];
+        gameState.players.forEach(p => {
+          if (p.score > maxScore) {
+            maxScore = p.score;
+            winners = [p.name];
+          } else if (p.score === maxScore) {
+            winners.push(p.name);
+          }
+        });
+        winnerText = winners.length === 1 ? winners[0] : `引き分け (${winners.join(", ")})`;
+        resultDetail = `${maxScore}点`;
+      } else {
+        // TIME判定 (SPEED_ATTACK, MOLE_HIT) - タイムが短い方が勝ち
+        let minTime = 999999;
+        let winners = [];
+        gameState.players.forEach(p => {
+          if (p.time > 0 && p.time < minTime) {
+            minTime = p.time;
+            winners = [p.name];
+          } else if (p.time > 0 && p.time === minTime) {
+            winners.push(p.name);
+          }
+        });
+        winnerText = winners.length > 0 ? (winners.length === 1 ? winners[0] : `引き分け (${winners.join(", ")})`) : "記録なし";
+        resultDetail = minTime < 999999 ? `${minTime.toFixed(2)}秒` : "クリアなし";
+      }
+
+      showHitPop(`🎉 勝者: ${winnerText}! (${resultDetail})`, "hit");
+      addHistoryItem(`🎉 ゲームセット！ 勝者: <b>${winnerText}</b> (${resultDetail})`, "game-end");
+      
+      document.getElementById("turnStartBox").style.display = "none";
+      document.getElementById("missBtn").style.display = "none";
+    }
+
+    function addHistoryItem(text, type = "normal", badgeText = "") {
+      const list = document.getElementById("historyList");
+      if (list.children.length === 1 && list.children[0].style.color !== "") list.innerHTML = "";
+      const li = document.createElement("li");
+      li.className = "history-item " + type;
+      let content = `<span>${text}</span>`;
+      if (badgeText) content += `<span class="badge">${badgeText}</span>`;
+      li.innerHTML = content;
+      list.insertBefore(li, list.firstChild);
+    }
+
+    function clearHistory() {
+      document.getElementById("historyList").innerHTML = '<li class="history-item" style="color: #888;">投球データ待機中...</li>';
+    }
+
+    function exitGame() {
+      gameState.isGameRunning = false;
+      if (gameTimer) clearInterval(gameTimer);
+      document.getElementById("gameScreen").style.display = "none";
+      document.getElementById("setupScreen").style.display = "block";
     }
   </script>
 </body>
