@@ -32,6 +32,11 @@
       color: #30d158;
       border: 1px solid #30d158;
     }
+    .status-badge.disconnected {
+      background-color: #3a1b1b;
+      color: #ff453a;
+      border: 1px solid #ff453a;
+    }
 
     .display-panel {
       width: 100%;
@@ -158,6 +163,7 @@
     const CHARACTERISTIC_UUID_RX = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
     const CHARACTERISTIC_UUID_TX = '8260c02c-502a-466d-a19e-e31448b1116b';
 
+    let bluetoothDevice = null;
     let rxCharacteristic = null;
     let audioCtx = null;
     let selectedModeNum = 1;
@@ -194,13 +200,16 @@
       if (audioCtx.state === 'suspended') await audioCtx.resume();
 
       try {
-        const device = await navigator.bluetooth.requestDevice({
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: [SERVICE_UUID]
         });
 
+        // 切断イベントの自動ハンドリング登録
+        bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
         document.getElementById('connectionStatus').innerText = '接続中...';
-        const server = await device.gatt.connect();
+        const server = await bluetoothDevice.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
 
         rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_RX);
@@ -209,19 +218,39 @@
         await txCharacteristic.startNotifications();
         txCharacteristic.addEventListener('characteristicvaluechanged', handleBLEData);
 
-        document.getElementById('connectionStatus').innerText = '✅ 接続完了！';
-        document.getElementById('connectionStatus').classList.add('connected');
+        const statusBadge = document.getElementById('connectionStatus');
+        statusBadge.innerText = '✅ 接続完了！';
+        statusBadge.className = 'status-badge connected';
         document.getElementById('btnConnect').style.display = 'none';
 
       } catch (err) {
         console.error(err);
         alert('接続に失敗しました。');
+        resetConnectionUI('❌ 接続失敗');
       }
+    }
+
+    // 切断されたときの自動復帰処理
+    function onDisconnected(event) {
+      console.log('Bluetooth切断検出');
+      stopTimerUI();
+      rxCharacteristic = null;
+      resetConnectionUI('⚠️ 切断されました（再接続してください）');
+    }
+
+    function resetConnectionUI(msg) {
+      const statusBadge = document.getElementById('connectionStatus');
+      statusBadge.innerText = msg;
+      statusBadge.className = 'status-badge disconnected';
+      
+      const btnConnect = document.getElementById('btnConnect');
+      btnConnect.style.display = 'block';
+      btnConnect.innerText = '🔄 Bluetooth 再接続';
     }
 
     async function startGame() {
       if (!rxCharacteristic) {
-        alert('先にBluetooth機器を接続してください。');
+        alert('Bluetoothが切断されています。再接続してください。');
         return;
       }
       stopTimerUI();
@@ -232,14 +261,19 @@
       try {
         const encoder = new TextEncoder();
         await rxCharacteristic.writeValue(encoder.encode('START_MODE' + selectedModeNum));
-      } catch (err) { console.error(err); }
+      } catch (err) { 
+        console.error('送信エラー:', err);
+        alert('送信に失敗しました。再接続をお試しください。');
+      }
     }
 
     async function stopGame() {
       stopTimerUI();
       if (rxCharacteristic) {
-        const encoder = new TextEncoder();
-        await rxCharacteristic.writeValue(encoder.encode('STOP'));
+        try {
+          const encoder = new TextEncoder();
+          await rxCharacteristic.writeValue(encoder.encode('STOP'));
+        } catch (e) { console.error(e); }
       }
       document.getElementById('statusText').innerText = 'READY';
     }
@@ -251,23 +285,19 @@
       }
     }
 
-    // BLE受信データの処理
     function handleBLEData(event) {
       const decoder = new TextDecoder();
       const msg = decoder.decode(event.target.value).trim();
       console.log('受信:', msg);
 
-      // 1. カウントダウン (3, 2, 1)
       if (msg === '3' || msg === '2' || msg === '1') {
         document.getElementById('statusText').innerText = msg;
-        playBeep(440, 0.15); // 低い「ピッ」
+        playBeep(440, 0.15);
       } 
-      // 2. スタート (GO)
       else if (msg === 'GO' || msg === 'GAME_START') {
         document.getElementById('statusText').innerText = 'GO!!';
-        playBeep(880, 0.4); // 高い「ピー！」
+        playBeep(880, 0.4);
         
-        // スマホ側でタイマーをカウントアップ開始
         startTime = Date.now();
         stopTimerUI();
         gameTimer = setInterval(() => {
@@ -275,13 +305,11 @@
           document.getElementById('timerText').innerText = 'TIME: ' + elapsed;
         }, 100);
       } 
-      // 3. ヒット (HIT:1など)
       else if (msg.startsWith('HIT:')) {
         const score = msg.split(':')[1];
         document.getElementById('scoreText').innerText = 'SCORE: ' + score;
         playBeep(523, 0.1);
       } 
-      // 4. クリア（スピードクリアモード）
       else if (msg.startsWith('CLEAR:')) {
         stopTimerUI();
         const clearTime = msg.split(':')[1];
@@ -289,7 +317,6 @@
         document.getElementById('timerText').innerText = 'TIME: ' + clearTime;
         playBeep(1046, 0.6);
       }
-      // 5. タイムアップ
       else if (msg.startsWith('TIME_UP')) {
         stopTimerUI();
         document.getElementById('statusText').innerText = 'FINISH!';
