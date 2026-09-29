@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>シューティングターゲット</title>
+  <title>シューティングターゲットコントローラー</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -213,7 +213,7 @@
 
   <!-- 1. 設定画面 -->
   <div id="setupScreen">
-    <h1>シューティングターゲット</h1>
+    <h1>🎯 シューティングターゲット設定</h1>
 
     <div class="card">
       <h2>1. ESP32接続</h2>
@@ -309,11 +309,10 @@
       players: [],        
       currentTurnIdx: 0,  
       mode: "TIME_ATTACK",
-      // プレイ中フラグ・状態管理
       remainingTime: 60,
       elapsedTime: 0,
       isGameRunning: false,
-      molePhase: "NORMAL", // NORMAL, WARNING, FAST
+      molePhase: "NORMAL",
       warningStartTime: 0
     };
 
@@ -350,7 +349,6 @@
       }
     }
 
-    // 🔊 Web Audio API によるサウンド合成
     function playSound(type) {
       try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -359,7 +357,6 @@
         const now = audioCtx.currentTime;
 
         if (type === 'hit') {
-          // 命中音 (ピコーン)
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sine';
@@ -373,7 +370,6 @@
           osc.stop(now + 0.1);
 
         } else if (type === 'beep') {
-          // カウントダウン音 (ピッ)
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sine';
@@ -386,7 +382,6 @@
           osc.stop(now + 0.15);
 
         } else if (type === 'start') {
-          // スタート音 (ピー！)
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sine';
@@ -399,7 +394,6 @@
           osc.stop(now + 0.6);
 
         } else if (type === 'warning_pulse') {
-          // 警告ビープ (デン！デン！デン！)
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'sawtooth';
@@ -413,7 +407,6 @@
           osc.stop(now + 0.2);
 
         } else if (type === 'miss') {
-          // ミス音 (ブッ)
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
           osc.type = 'square';
@@ -435,12 +428,18 @@
       document.getElementById("modeDescription").innerHTML = modeDescriptions[selectedMode];
     }
 
+    // 🔑 BLE接続処理（全デバイス表示オプションに修正）
     async function connectBLE() {
       try {
+        document.getElementById("status").innerText = "デバイス検索中...";
+        document.getElementById("status").style.color = "blue";
+
         bluetoothDevice = await navigator.bluetooth.requestDevice({
-          filters: [{ name: 'DartsTarget_ESP32' }],
-          optionalServices: [SERVICE_UUID]
+          acceptAllDevices: true, // 全てのBluetoothデバイスを表示
+          optionalServices: [SERVICE_UUID] // 通信に使用するサービスUUIDを登録
         });
+
+        document.getElementById("status").innerText = "接続中...";
         const server = await bluetoothDevice.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
         characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
@@ -448,10 +447,19 @@
         await characteristic.startNotifications();
         characteristic.addEventListener('characteristicvaluechanged', handleNotify);
 
-        document.getElementById("status").innerText = "接続完了！";
+        document.getElementById("status").innerText = `接続完了！ (${bluetoothDevice.name || 'ESP32'})`;
         document.getElementById("status").style.color = "green";
+
+        bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+          document.getElementById("status").innerText = "切断されました";
+          document.getElementById("status").style.color = "red";
+        });
+
       } catch (error) {
-        alert("接続エラー: " + error);
+        console.error("BLE Error:", error);
+        document.getElementById("status").innerText = "未接続（エラー発生）";
+        document.getElementById("status").style.color = "red";
+        alert("Bluetooth接続に失敗またはキャンセルされました:\n" + error.message);
       }
     }
 
@@ -567,7 +575,6 @@
       
       updateUIBoard();
 
-      // ESP32へモード変更・ターン開始を送信
       sendBLECommand("SET_MODE:" + gameState.mode);
       sendBLECommand("SHOT_START");
 
@@ -606,18 +613,15 @@
             const remaining = Math.max(0, 60 - elapsedSec);
             document.getElementById("displayTimer").innerText = `⏱️ ${remaining.toFixed(1)}秒`;
 
-            // 残り20秒に到達（40秒経過）で5秒間警告フェーズへ移行
             if (remaining <= 20) {
               triggerMoleWarning();
             }
 
           } else if (gameState.molePhase === "WARNING") {
-            // 警告音再生フェーズ中（タイマー停止中）
             const warnElapsed = (now - gameState.warningStartTime) / 1000;
             if (warnElapsed >= 5) {
-              // 5秒経過したら倍速モードで再開
               gameState.molePhase = "FAST";
-              timerStartTime = Date.now() - 40000; // 残り20秒（40秒経過時点）から再開
+              timerStartTime = Date.now() - 40000;
               sendBLECommand("MOLE_SPEED:FAST");
               showHitPop("⚡ 倍速モード開始！ (1秒で没)", "warning-style");
               addHistoryItem("⚡ <b>モグラたたき: 倍速モード突入！</b>", "round-end");
@@ -636,12 +640,11 @@
       }, 50);
     }
 
-    // ⚠️ モグラたたき: 5秒間の警告割り込み処理
     function triggerMoleWarning() {
       gameState.molePhase = "WARNING";
       gameState.warningStartTime = Date.now();
       
-      sendBLECommand("MOLE_SPEED:PAUSE"); // 的の動作を一時停止
+      sendBLECommand("MOLE_SPEED:PAUSE");
 
       const overlay = document.getElementById("countdownOverlay");
       const countNum = document.getElementById("countNum");
@@ -706,7 +709,6 @@
       }
     }
 
-    // 📡 ESP32からの通知受信
     function handleNotify(event) {
       if (!gameState.isGameRunning || gameState.molePhase === "WARNING") return;
 
@@ -762,7 +764,7 @@
       gameState.isGameRunning = false;
       clearInterval(gameTimer);
 
-      sendBLECommand("SHOT_END"); // 的の収納コマンド
+      sendBLECommand("SHOT_END");
 
       if (message) {
         showHitPop(message, isClear ? "hit" : "miss");
