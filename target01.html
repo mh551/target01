@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32 Target Game Controller</title>
+  <title>ESP32 ターゲットシューティング</title>
   <style>
     :root {
       --bg-color: #121212;
       --card-bg: #1e1e1e;
       --accent-color: #00e676;
-      --text-color: #ffffff;
-      --text-dim: #aaaaaa;
       --danger-color: #ff5252;
+      --text-color: #ffffff;
+      --sub-text: #aaaaaa;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: var(--bg-color);
       color: var(--text-color);
       margin: 0;
@@ -27,164 +27,154 @@
       box-sizing: border-box;
     }
 
+    h1 {
+      margin-top: 0;
+      font-size: 1.8rem;
+      text-align: center;
+    }
+
     .container {
       width: 100%;
       max-width: 500px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 15px;
     }
 
     .card {
       background-color: var(--card-bg);
-      border-radius: 12px;
       padding: 20px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
       text-align: center;
     }
 
-    h1 {
-      margin: 0 0 10px 0;
-      font-size: 1.2rem;
-      color: var(--text-dim);
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      font-weight: bold;
+    .btn {
       background-color: #333;
-      color: #888;
-      margin-bottom: 12px;
-    }
-
-    .status-badge.connected {
-      background-color: rgba(0, 230, 118, 0.2);
-      color: var(--accent-color);
-    }
-
-    .display-panel {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .display-box {
-      background-color: rgba(0,0,0,0.3);
-      padding: 15px;
-      border-radius: 8px;
-    }
-
-    .display-label {
-      font-size: 0.8rem;
-      color: var(--text-dim);
-      margin-bottom: 4px;
-    }
-
-    .display-value {
-      font-size: 2.2rem;
-      font-weight: bold;
-      font-family: 'Courier New', Courier, monospace;
-      color: var(--accent-color);
-    }
-
-    .overlay-message {
-      font-size: 2.5rem;
-      font-weight: 900;
-      color: #ffeb3b;
-      min-height: 3.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      letter-spacing: 2px;
-    }
-
-    .fever-text {
-      color: #ff4081;
-      animation: pulse 0.5s infinite alternate;
-    }
-
-    @keyframes pulse {
-      from { transform: scale(1); }
-      to { transform: scale(1.1); }
-    }
-
-    button {
-      width: 100%;
-      padding: 14px;
-      border: none;
-      border-radius: 8px;
+      color: var(--text-color);
+      border: 2px solid #555;
+      padding: 12px 20px;
       font-size: 1rem;
       font-weight: bold;
+      border-radius: 8px;
       cursor: pointer;
-      transition: background-color 0.2s, transform 0.1s;
+      transition: all 0.2s ease;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 8px;
     }
 
-    button:active {
-      transform: scale(0.98);
+    .btn:hover:not(:disabled) {
+      background-color: #444;
+      border-color: #777;
     }
 
-    button:disabled {
-      opacity: 0.4;
+    .btn:disabled {
+      opacity: 0.5;
       cursor: not-allowed;
     }
 
-    .btn-connect { background-color: #2979ff; color: white; }
-    .btn-disconnect { background-color: #424242; color: white; }
-    .btn-mode { background-color: #333; color: white; border: 1px solid #444; }
-    .btn-stop { background-color: var(--danger-color); color: white; }
+    .btn-connect {
+      background-color: #29b6f6;
+      border-color: #0288d1;
+      color: #000;
+    }
 
-    .btn-group {
+    .btn-stop {
+      background-color: var(--danger-color);
+      border-color: #d32f2f;
+      color: #fff;
+    }
+
+    .status-text {
+      font-size: 0.9rem;
+      color: var(--sub-text);
+      margin-top: 5px;
+    }
+
+    .status-connected {
+      color: var(--accent-color);
+      font-weight: bold;
+    }
+
+    .display-box {
+      font-size: 3rem;
+      font-weight: bold;
+      margin: 10px 0;
+      letter-spacing: 2px;
+    }
+
+    .score-val {
+      color: var(--accent-color);
+    }
+
+    .fever {
+      color: #ffeb3b;
+      animation: blink 0.5s infinite alternate;
+    }
+
+    @keyframes blink {
+      from { opacity: 1; }
+      to { opacity: 0.3; }
+    }
+
+    .mode-group {
       display: flex;
       flex-direction: column;
       gap: 10px;
+    }
+
+    .log-area {
+      background: #000;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 0.8rem;
+      padding: 10px;
+      height: 100px;
+      overflow-y: auto;
+      border-radius: 6px;
+      text-align: left;
     }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <!-- 接続管理 -->
+  <h1>ターゲットシューティング</h1>
+
+  <!-- 接続制御 -->
   <div class="card">
-    <div id="statusBadge" class="status-badge">未接続</div>
-    <div class="btn-group">
-      <button id="btnConnect" class="btn-connect" onclick="connectBLE()">Bluetooth接続</button>
-      <button id="btnDisconnect" class="btn-disconnect" onclick="disconnectBLE()" disabled>切断</button>
+    <button id="btnConnect" class="btn btn-connect" onclick="connectBLE()">Bluetooth 接続</button>
+    <div id="statusText" class="status-text">未接続</div>
+  </div>
+
+  <!-- ディスプレイエリア -->
+  <div class="card">
+    <div class="status-text">ステータス / メッセージ</div>
+    <div id="displayMsg" class="display-box">READY</div>
+    <div class="status-text">スコア / タイム</div>
+    <div id="displayScore" class="display-box score-val">0</div>
+  </div>
+
+  <!-- コントロールボタン -->
+  <div class="card">
+    <div class="mode-group">
+      <button class="btn game-btn" onclick="startGame(1)" disabled>① タイムアタック (60秒)</button>
+      <button class="btn game-btn" onclick="startGame(2)" disabled>② スピードクリア (全倒し)</button>
+      <button class="btn game-btn" onclick="startGame(3)" disabled>③ モグラたたき (60秒)</button>
+      <button class="btn btn-stop game-btn" onclick="stopGame()" disabled>STOP (強制終了)</button>
     </div>
   </div>
 
-  <!-- メインディスプレイ -->
+  <!-- 通信ログ -->
   <div class="card">
-    <div id="overlayMsg" class="overlay-message">READY</div>
-    <div class="display-panel">
-      <div class="display-box">
-        <div class="display-label">SCORE</div>
-        <div id="scoreVal" class="display-value">0</div>
-      </div>
-      <div class="display-box">
-        <div class="display-label">TIME / RESULT</div>
-        <div id="timeVal" class="display-value">0.0</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ゲームモード選択 -->
-  <div class="card">
-    <h1>モード選択</h1>
-    <div class="btn-group">
-      <button class="btn-mode game-btn" onclick="startMode(1)" disabled>① タイムアタック (60秒)</button>
-      <button class="btn-mode game-btn" onclick="startMode(2)" disabled>② スピードクリア (全倒し)</button>
-      <button class="btn-mode game-btn" onclick="startMode(3)" disabled>③ モグラたたき (60秒)</button>
-      <button class="btn-stop game-btn" onclick="sendStop()" disabled style="margin-top: 10px;">STOP（中断）</button>
-    </div>
+    <div class="status-text" style="margin-bottom: 5px;">受信ログ</div>
+    <div id="logArea" class="log-area"></div>
   </div>
 </div>
 
 <script>
-  // ESP32の定義と一致させるUUID
+  // C++コードのUUID設定と一致させる
   const SERVICE_UUID           = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
   const CHARACTERISTIC_UUID_RX = "beb5483e-36e1-4688-b7f5-ea07361b26a8"; 
   const CHARACTERISTIC_UUID_TX = "8260c02c-502a-466d-a19e-e31448b1116b"; 
@@ -193,54 +183,53 @@
   let rxCharacteristic = null;
   let txCharacteristic = null;
 
-  let timerInterval = null;
-  let startTime = 0;
-  let activeMode = 0;
+  const btnConnect = document.getElementById('btnConnect');
+  const statusText = document.getElementById('statusText');
+  const displayMsg = document.getElementById('displayMsg');
+  const displayScore = document.getElementById('displayScore');
+  const logArea = document.getElementById('logArea');
+  const gameButtons = document.querySelectorAll('.game-btn');
 
-  // Web Audio API（効果音生成用）
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-  function playSound(freq, duration, type = 'sine') {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-  }
-
-  // --- BLE 接続処理 ---
+  // BLE接続処理
   async function connectBLE() {
     try {
+      log("Bluetoothデバイスを検索中...");
       bleDevice = await navigator.bluetooth.requestDevice({
-        filters: [{ name: 'Target01' }],
-        optionalServices: [SERVICE_UUID]
+        filters: [{ serviceUUIDs: [SERVICE_UUID] }]
       });
 
       bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
+      log("GATTサーバーへ接続中...");
       const server = await bleDevice.gatt.connect();
+
+      log("サービスを取得中...");
       const service = await server.getPrimaryService(SERVICE_UUID);
 
-      // ESP32のRX/TX視点とWeb BLE側の書き込み/読み込み関係のセットアップ
+      log("キャラクタリスティクを取得中...");
       rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_RX);
       txCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_TX);
 
+      // 通知（Notify）の受け取り設定
       await txCharacteristic.startNotifications();
-      txCharacteristic.addEventListener('characteristicvaluechanged', handleBLEData);
+      txCharacteristic.addEventListener('characteristicvaluechanged', handleData);
 
-      updateUIConnected(true);
+      statusText.textContent = "接続完了: " + bleDevice.name;
+      statusText.classList.add("status-connected");
+      btnConnect.textContent = "切断";
+      btnConnect.onclick = disconnectBLE;
+
+      // ボタンの有効化
+      setButtonsEnabled(true);
+      log("接続が完了しました。");
+
     } catch (error) {
-      console.error('BLE Connection Error:', error);
-      alert('接続に失敗しました: ' + error);
+      log("エラー: " + error);
+      console.error(error);
     }
   }
 
+  // 切断処理
   function disconnectBLE() {
     if (bleDevice && bleDevice.gatt.connected) {
       bleDevice.gatt.disconnect();
@@ -248,124 +237,86 @@
   }
 
   function onDisconnected() {
-    updateUIConnected(false);
-    stopTimer();
+    statusText.textContent = "未接続";
+    statusText.classList.remove("status-connected");
+    btnConnect.textContent = "Bluetooth 接続";
+    btnConnect.onclick = connectBLE;
+    setButtonsEnabled(false);
+    displayMsg.textContent = "OFFLINE";
+    displayMsg.classList.remove("fever");
+    log("切断されました。");
   }
 
-  function updateUIConnected(isConnected) {
-    const badge = document.getElementById('statusBadge');
-    badge.textContent = isConnected ? '接続完了' : '未接続';
-    badge.className = 'status-badge ' + (isConnected ? 'connected' : '');
+  // 受信データのハンドリング
+  function handleData(event) {
+    const value = new TextDecoder().decode(event.target.value);
+    log("受信: " + value);
 
-    document.getElementById('btnConnect').disabled = isConnected;
-    document.getElementById('btnDisconnect').disabled = !isConnected;
-
-    document.querySelectorAll('.game-btn').forEach(btn => {
-      btn.disabled = !isConnected;
-    });
+    if (value === "3" || value === "2" || value === "1") {
+      displayMsg.textContent = value;
+      displayMsg.classList.remove("fever");
+      displayScore.textContent = "0";
+    } 
+    else if (value === "GO") {
+      displayMsg.textContent = "START!";
+    } 
+    else if (value.startsWith("HIT:")) {
+      const score = value.split(":")[1];
+      displayScore.textContent = score;
+    } 
+    else if (value.startsWith("TIME_UP:")) {
+      const finalScore = value.split(":")[1];
+      displayMsg.textContent = "FINISH!";
+      displayMsg.classList.remove("fever");
+      displayScore.textContent = finalScore;
+    } 
+    else if (value.startsWith("CLEAR:")) {
+      const clearTime = value.split(":")[1];
+      displayMsg.textContent = "CLEAR!";
+      displayScore.textContent = clearTime + "s";
+    } 
+    else if (value === "SPEED_UP") {
+      displayMsg.textContent = "FEVER!";
+      displayMsg.classList.add("fever");
+    }
   }
 
-  // --- コマンド送信 ---
+  // コマンド送信関数
   async function sendCommand(cmd) {
     if (!rxCharacteristic) return;
     try {
       const encoder = new TextEncoder();
       await rxCharacteristic.writeValue(encoder.encode(cmd));
-    } catch (e) {
-      console.error('Command Send Error:', e);
+      log("送信: " + cmd);
+    } catch (error) {
+      log("送信エラー: " + error);
     }
   }
 
-  function startMode(modeNum) {
-    activeMode = modeNum;
-    resetDisplay();
-    sendCommand(`START_MODE${modeNum}`);
+  // ゲーム開始指示
+  function startGame(modeNum) {
+    displayMsg.classList.remove("fever");
+    displayMsg.textContent = "STANDBY";
+    sendCommand("START_MODE" + modeNum);
   }
 
-  function sendStop() {
-    sendCommand('STOP');
-    stopTimer();
-    document.getElementById('overlayMsg').textContent = 'STOPPED';
+  // ゲーム停止指示
+  function stopGame() {
+    displayMsg.classList.remove("fever");
+    displayMsg.textContent = "STOPPED";
+    sendCommand("STOP");
   }
 
-  function resetDisplay() {
-    stopTimer();
-    document.getElementById('scoreVal').textContent = '0';
-    document.getElementById('timeVal').textContent = '0.0';
-    document.getElementById('overlayMsg').className = 'overlay-message';
-    document.getElementById('overlayMsg').textContent = 'READY';
+  // ボタン有効/無効切り替え
+  function setButtonsEnabled(enabled) {
+    gameButtons.forEach(btn => btn.disabled = !enabled);
   }
 
-  // --- ESP32からの通知データ処理 ---
-  function handleBLEData(event) {
-    const value = new TextDecoder().decode(event.target.value).trim();
-    console.log('Received:', value);
-
-    const overlay = document.getElementById('overlayMsg');
-
-    // カウントダウン処理 (3 -> 2 -> 1 -> GO)
-    if (["3", "2", "1"].includes(value)) {
-      overlay.textContent = value;
-      playSound(440, 0.15); // カウント音
-    } 
-    else if (value === "GO") {
-      overlay.textContent = "GO!";
-      playSound(880, 0.4); // スタート音
-      startTimer();
-      setTimeout(() => { if (overlay.textContent === "GO!") overlay.textContent = ""; }, 1000);
-    }
-    // ヒット通知 (HIT:スコア)
-    else if (value.startsWith("HIT:")) {
-      const score = value.split(":")[1];
-      document.getElementById('scoreVal').textContent = score;
-      playSound(1200, 0.08, 'square'); // ヒット音
-    }
-    // スピードアップ通知 (モグラたたき Fever)
-    else if (value === "SPEED_UP") {
-      overlay.textContent = "FEVER!";
-      overlay.classList.add('fever-text');
-      playSound(1500, 0.3, 'sawtooth');
-    }
-    // スピードクリアモードのタイム完了
-    else if (value.startsWith("CLEAR:")) {
-      stopTimer();
-      const clearTime = value.split(":")[1];
-      document.getElementById('timeVal').textContent = clearTime;
-      overlay.textContent = "CLEAR!";
-      playSound(900, 0.5);
-    }
-    // タイムアップ通知
-    else if (value.startsWith("TIME_UP:")) {
-      stopTimer();
-      const finalScore = value.split(":")[1];
-      document.getElementById('scoreVal').textContent = finalScore;
-      overlay.textContent = "TIME UP";
-      playSound(300, 0.6);
-    }
-  }
-
-  // --- Web側のタイマー管理 ---
-  function startTimer() {
-    startTime = Date.now();
-    timerInterval = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      
-      if (activeMode === 1 || activeMode === 3) {
-        // 60秒カウントダウン表示
-        const remaining = Math.max(0, 60 - elapsed);
-        document.getElementById('timeVal').textContent = remaining.toFixed(1);
-      } else if (activeMode === 2) {
-        // ストップウォッチ表示
-        document.getElementById('timeVal').textContent = elapsed.toFixed(1);
-      }
-    }, 100);
-  }
-
-  function stopTimer() {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
+  // ログ出力関数
+  function log(message) {
+    const now = new Date().toLocaleTimeString();
+    logArea.innerHTML += `[${now}] ${message}<br>`;
+    logArea.scrollTop = logArea.scrollHeight;
   }
 </script>
 </body>
