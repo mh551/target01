@@ -195,8 +195,9 @@
     try {
       log("Bluetoothデバイスを検索中...");
       bleDevice = await navigator.bluetooth.requestDevice({
-        filters: [{ serviceUUIDs: [SERVICE_UUID] }]
-      });
+  acceptAllDevices: true,
+  optionalServices: [SERVICE_UUID]
+});
 
       bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
 
