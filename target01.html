@@ -3,43 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32 ターゲットシューティング</title>
+  <title>ESP32 ターゲットシューティング＆ランキング</title>
   <style>
     :root {
       --bg-color: #121212;
       --card-bg: #1e1e1e;
       --accent-color: #00e676;
       --danger-color: #ff5252;
+      --warning-color: #ffb74d;
       --text-color: #ffffff;
       --sub-text: #aaaaaa;
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: var(--bg-color);
       color: var(--text-color);
-      margin: 0;
       padding: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
-      box-sizing: border-box;
     }
 
-    h1 {
-      margin-top: 0;
-      font-size: 1.8rem;
-      text-align: center;
-    }
+    h1 { font-size: 1.8rem; text-align: center; margin-bottom: 15px; }
 
-    .container {
-      width: 100%;
-      max-width: 500px;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-    }
+    .container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; }
 
     .card {
       background-color: var(--card-bg);
@@ -53,128 +44,162 @@
       background-color: #333;
       color: var(--text-color);
       border: 2px solid #555;
-      padding: 12px 20px;
+      padding: 12px;
       font-size: 1rem;
       font-weight: bold;
       border-radius: 8px;
       cursor: pointer;
-      transition: all 0.2s ease;
       width: 100%;
-      box-sizing: border-box;
       margin-top: 8px;
     }
 
-    .btn:hover:not(:disabled) {
-      background-color: #444;
-      border-color: #777;
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-connect { background-color: #29b6f6; border-color: #0288d1; color: #000; }
+    .btn-selected { background-color: #1976d2 !important; border-color: #64b5f6 !important; }
+    .btn-start { background-color: var(--accent-color); border-color: #00c853; color: #000; font-size: 1.3rem; }
+    .btn-stop { background-color: var(--danger-color); border-color: #d32f2f; color: #fff; }
+
+    .status-text { font-size: 0.9rem; color: var(--sub-text); margin-top: 5px; }
+    .status-connected { color: var(--accent-color); font-weight: bold; }
+
+    .display-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .display-box { background-color: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; }
+    .display-val { font-size: 2.5rem; font-weight: bold; font-family: monospace; color: var(--accent-color); }
+
+    .input-group { margin: 10px 0; text-align: left; }
+    .input-group label { display: block; font-size: 0.85rem; color: var(--sub-text); margin-bottom: 4px; }
+    .input-field {
+      width: 100%; padding: 10px; font-size: 1rem; border-radius: 6px;
+      border: 1px solid #555; background: #2a2a2a; color: #fff;
     }
 
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .player-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+    .player-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #2a2a2a; padding: 10px; border-radius: 6px;
+    }
+    .player-row.active { border: 2px solid var(--accent-color); background: #1b382b; }
+
+    /* 全画面オーバーレイ (3-2-1 カウントダウン) */
+    #countdownOverlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.85); display: flex; align-items: center;
+      justify-content: center; z-index: 9998;
+    }
+    #countdownText { font-size: 8rem; font-weight: 900; color: #ffeb3b; text-shadow: 0 0 30px #ffeb3b; }
+
+    /* 全画面オーバーレイ (WARNING) */
+    .full-warning-overlay {
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background-color: rgba(0, 0, 0, 0.85); border: 10px solid #ff5252;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; z-index: 9999; pointer-events: none;
+    }
+    .full-warning-text {
+      font-size: 4.5rem; font-weight: 900; color: #ff5252;
+      text-shadow: 0 0 20px #ff0000; animation: blink 0.2s infinite alternate;
     }
 
-    .btn-connect {
-      background-color: #29b6f6;
-      border-color: #0288d1;
-      color: #000;
-    }
+    @keyframes blink { from { opacity: 1; } to { opacity: 0.1; } }
 
-    .btn-stop {
-      background-color: var(--danger-color);
-      border-color: #d32f2f;
-      color: #fff;
-    }
+    /* ランキングテーブル */
+    .ranking-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.95rem; }
+    .ranking-table th, .ranking-table td { padding: 8px; border-bottom: 1px solid #444; text-align: center; }
+    .ranking-table th { background-color: #2a2a2a; color: var(--sub-text); }
+    .rank-1 { color: #ffd700; font-weight: bold; }
+    .rank-2 { color: #c0c0c0; font-weight: bold; }
+    .rank-3 { color: #cd7f32; font-weight: bold; }
 
-    .status-text {
-      font-size: 0.9rem;
-      color: var(--sub-text);
-      margin-top: 5px;
-    }
-
-    .status-connected {
-      color: var(--accent-color);
-      font-weight: bold;
-    }
-
-    .display-box {
-      font-size: 3rem;
-      font-weight: bold;
-      margin: 10px 0;
-      letter-spacing: 2px;
-    }
-
-    .score-val {
-      color: var(--accent-color);
-    }
-
-    .fever {
-      color: #ffeb3b;
-      animation: blink 0.5s infinite alternate;
-    }
-
-    @keyframes blink {
-      from { opacity: 1; }
-      to { opacity: 0.3; }
-    }
-
-    .mode-group {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .log-area {
-      background: #000;
-      color: #0f0;
-      font-family: monospace;
-      font-size: 0.8rem;
-      padding: 10px;
-      height: 100px;
-      overflow-y: auto;
-      border-radius: 6px;
-      text-align: left;
-    }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 
+<!-- カウントダウン表示 -->
+<div id="countdownOverlay" class="hidden"><div id="countdownText">3</div></div>
+
+<!-- WARNING表示 -->
+<div id="warningOverlay" class="full-warning-overlay hidden">
+  <div class="full-warning-text">WARNING!</div>
+  <div style="font-size: 1.8rem; color: #ffb74d; margin-top: 15px; font-weight: bold;">FEVER MODE COMING</div>
+</div>
+
 <div class="container">
   <h1>ターゲットシューティング</h1>
 
-  <!-- 接続制御 -->
+  <!-- BLE接続 -->
   <div class="card">
     <button id="btnConnect" class="btn btn-connect" onclick="connectBLE()">Bluetooth 接続</button>
     <div id="statusText" class="status-text">未接続</div>
   </div>
 
-  <!-- ディスプレイエリア -->
-  <div class="card">
-    <div class="status-text">ステータス / メッセージ</div>
-    <div id="displayMsg" class="display-box">READY</div>
-    <div class="status-text">スコア / タイム</div>
-    <div id="displayScore" class="display-box score-val">0</div>
-  </div>
-
-  <!-- コントロールボタン -->
-  <div class="card">
-    <div class="mode-group">
-      <button class="btn game-btn" onclick="startGame(1)" disabled>① タイムアタック (60秒)</button>
-      <button class="btn game-btn" onclick="startGame(2)" disabled>② スピードクリア (全倒し)</button>
-      <button class="btn game-btn" onclick="startGame(3)" disabled>③ モグラたたき (60秒)</button>
-      <button class="btn btn-stop game-btn" onclick="stopGame()" disabled>STOP (強制終了)</button>
+  <!-- STEP 1: プレイヤーエントリー -->
+  <div id="panelPlayers" class="card">
+    <h3>1. プレイヤー登録</h3>
+    <div class="input-group">
+      <label>参加人数</label>
+      <input type="number" id="playerCount" class="input-field" value="2" min="1" max="10" onchange="generatePlayerInputs()">
     </div>
+    <div id="playerInputs" class="player-list"></div>
+    <button class="btn" style="background:#1976d2;" onclick="confirmPlayers()">プレイヤー決定 ➔</button>
   </div>
 
-  <!-- 通信ログ -->
-  <div class="card">
-    <div class="status-text" style="margin-bottom: 5px;">受信ログ</div>
-    <div id="logArea" class="log-area"></div>
+  <!-- STEP 2: モード選択 ＆ スタート待機 -->
+  <div id="panelGameSetup" class="card hidden">
+    <h3>2. モード選択</h3>
+    <div style="display:flex; flex-direction:column; gap:8px; margin: 10px 0;">
+      <button class="btn mode-btn" onclick="selectMode(1)">① タイムアタック (60秒)</button>
+      <button class="btn mode-btn" onclick="selectMode(2)">② スピードクリア (全倒し)</button>
+      <button class="btn mode-btn" onclick="selectMode(3)">③ モグラたたき (60秒)</button>
+    </div>
+
+    <div style="margin-top: 15px; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+      <div style="font-size: 0.85rem; color: var(--sub-text);">現在の挑戦者</div>
+      <div id="currentPlayerName" style="font-size: 1.4rem; font-weight: bold; color: var(--accent-color);">---</div>
+    </div>
+
+    <button id="btnStart" class="btn btn-start" onclick="pressStart()" disabled>START</button>
+    <button class="btn" style="font-size: 0.85rem;" onclick="resetPlayers()">← プレイヤー再登録</button>
+  </div>
+
+  <!-- STEP 3: プレイ中画面 -->
+  <div id="panelPlaying" class="card hidden">
+    <div id="displayMsg" style="font-size: 1.5rem; font-weight: bold; min-height: 2rem;">PLAYING</div>
+    <div class="display-panel">
+      <div class="display-box">
+        <div class="status-text">SCORE</div>
+        <div id="displayScore" class="display-val">0</div>
+      </div>
+      <div class="display-box">
+        <div class="status-text">TIME</div>
+        <div id="displayTime" class="display-val">60.0</div>
+      </div>
+    </div>
+    <button id="btnStop" class="btn btn-stop" onclick="stopGame()" style="margin-top: 15px;">STOP (強制終了)</button>
+  </div>
+
+  <!-- STEP 4: ランキング表示 -->
+  <div id="panelRanking" class="card hidden">
+    <h3>🏆 最終ランキング 🏆</h3>
+    <table class="ranking-table">
+      <thead>
+        <tr>
+          <th>順位</th>
+          <th>名前</th>
+          <th>スコア</th>
+          <th>タイム</th>
+        </tr>
+      </thead>
+      <tbody id="rankingBody"></tbody>
+    </table>
+    <button class="btn" style="background:#1976d2; margin-top: 15px;" onclick="restartGameSeries()">同じメンバーで再戦</button>
+    <button class="btn" style="font-size: 0.85rem;" onclick="resetPlayers()">新しくプレイヤー登録</button>
   </div>
 </div>
 
 <script>
-  // C++コードのUUID設定と一致させる
   const SERVICE_UUID           = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
   const CHARACTERISTIC_UUID_RX = "beb5483e-36e1-4688-b7f5-ea07361b26a8"; 
   const CHARACTERISTIC_UUID_TX = "8260c02c-502a-466d-a19e-e31448b1116b"; 
@@ -183,141 +208,298 @@
   let rxCharacteristic = null;
   let txCharacteristic = null;
 
-  const btnConnect = document.getElementById('btnConnect');
-  const statusText = document.getElementById('statusText');
-  const displayMsg = document.getElementById('displayMsg');
-  const displayScore = document.getElementById('displayScore');
-  const logArea = document.getElementById('logArea');
-  const gameButtons = document.querySelectorAll('.game-btn');
+  let players = [];
+  let currentPlayerIndex = 0;
+  let selectedMode = 0;
+  
+  let gameResults = []; // { name, score, time }
+  
+  let timerInterval = null;
+  let gameStartTime = 0;
+  let isTimerPaused = false;
+  let totalPausedTime = 0;
+  let warningTriggered = false;
+  let warningSoundInterval = null;
 
-  // BLE接続処理
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function playBeep(freq, duration) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  }
+
+  // --- プレイヤーエントリー機能 ---
+  function generatePlayerInputs() {
+    const count = parseInt(document.getElementById('playerCount').value) || 1;
+    const container = document.getElementById('playerInputs');
+    container.innerHTML = '';
+    for (let i = 1; i <= count; i++) {
+      container.innerHTML += `
+        <div class="input-group">
+          <label>プレイヤー ${i} 名</label>
+          <input type="text" class="input-field player-name-input" value="プレイヤー${i}">
+        </div>
+      `;
+    }
+  }
+  generatePlayerInputs();
+
+  function confirmPlayers() {
+    const inputs = document.querySelectorAll('.player-name-input');
+    players = Array.from(inputs).map(input => input.value.trim() || 'No Name');
+    currentPlayerIndex = 0;
+    gameResults = [];
+
+    document.getElementById('panelPlayers').classList.add('hidden');
+    document.getElementById('panelGameSetup').classList.remove('hidden');
+    updateCurrentPlayerDisplay();
+  }
+
+  function resetPlayers() {
+    players = [];
+    currentPlayerIndex = 0;
+    gameResults = [];
+    document.getElementById('panelRanking').classList.add('hidden');
+    document.getElementById('panelGameSetup').classList.add('hidden');
+    document.getElementById('panelPlayers').classList.remove('hidden');
+  }
+
+  function updateCurrentPlayerDisplay() {
+    if (currentPlayerIndex < players.length) {
+      document.getElementById('currentPlayerName').textContent = `${players[currentPlayerIndex]} (${currentPlayerIndex + 1}/${players.length})`;
+    }
+  }
+
+  // --- BLE接続処理 ---
   async function connectBLE() {
     try {
-      log("Bluetoothデバイスを検索中...");
       bleDevice = await navigator.bluetooth.requestDevice({
-  acceptAllDevices: true,
-  optionalServices: [SERVICE_UUID]
-});
-
-      bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-
-      log("GATTサーバーへ接続中...");
+        filters: [{ name: 'Target_01' }],
+        optionalServices: [SERVICE_UUID]
+      });ice.addEventListener('gattserverdisconnected', onDisconnected);
       const server = await bleDevice.gatt.connect();
-
-      log("サービスを取得中...");
       const service = await server.getPrimaryService(SERVICE_UUID);
 
-      log("キャラクタリスティクを取得中...");
       rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_RX);
       txCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_TX);
 
-      // 通知（Notify）の受け取り設定
       await txCharacteristic.startNotifications();
       txCharacteristic.addEventListener('characteristicvaluechanged', handleData);
 
-      statusText.textContent = "接続完了: " + bleDevice.name;
-      statusText.classList.add("status-connected");
-      btnConnect.textContent = "切断";
-      btnConnect.onclick = disconnectBLE;
-
-      // ボタンの有効化
-      setButtonsEnabled(true);
-      log("接続が完了しました。");
-
+      document.getElementById('statusText').textContent = "接続完了: " + bleDevice.name;
+      document.getElementById('statusText').classList.add("status-connected");
+      document.getElementById('btnConnect').textContent = "切断";
+      document.getElementById('btnConnect').onclick = disconnectBLE;
     } catch (error) {
-      log("エラー: " + error);
-      console.error(error);
+      alert("接続失敗: " + error);
     }
   }
 
-  // 切断処理
   function disconnectBLE() {
-    if (bleDevice && bleDevice.gatt.connected) {
-      bleDevice.gatt.disconnect();
-    }
+    if (bleDevice && bleDevice.gatt.connected) bleDevice.gatt.disconnect();
   }
 
   function onDisconnected() {
-    statusText.textContent = "未接続";
-    statusText.classList.remove("status-connected");
-    btnConnect.textContent = "Bluetooth 接続";
-    btnConnect.onclick = connectBLE;
-    setButtonsEnabled(false);
-    displayMsg.textContent = "OFFLINE";
-    displayMsg.classList.remove("fever");
-    log("切断されました。");
+    document.getElementById('statusText').textContent = "未接続";
+    document.getElementById('statusText').classList.remove("status-connected");
+    document.getElementById('btnConnect').textContent = "Bluetooth 接続";
+    document.getElementById('btnConnect').onclick = connectBLE;
   }
 
-  // 受信データのハンドリング
-  function handleData(event) {
-    const value = new TextDecoder().decode(event.target.value);
-    log("受信: " + value);
+  // --- モード選択 ＆ スタート ---
+  function selectMode(modeNum) {
+    selectedMode = modeNum;
+    const btns = document.querySelectorAll('.mode-btn');
+    btns.forEach((btn, idx) => {
+      if (idx === modeNum - 1) btn.classList.add('btn-selected');
+      else btn.classList.remove('btn-selected');
+    });
+    document.getElementById('btnStart').disabled = false;
+  }
 
-    if (value === "3" || value === "2" || value === "1") {
-      displayMsg.textContent = value;
-      displayMsg.classList.remove("fever");
-      displayScore.textContent = "0";
-    } 
-    else if (value === "GO") {
-      displayMsg.textContent = "START!";
-    } 
-    else if (value.startsWith("HIT:")) {
+  function pressStart() {
+    if (selectedMode === 0) return;
+    
+    // カウントダウン演出へ
+    const overlay = document.getElementById('countdownOverlay');
+    const textEl = document.getElementById('countdownText');
+    overlay.classList.remove('hidden');
+
+    let count = 3;
+    textEl.textContent = count;
+    playBeep(440, 0.15);
+
+    const countdownTimer = setInterval(() => {
+      count--;
+      if (count > 0) {
+        textEl.textContent = count;
+        playBeep(440, 0.15);
+      } else if (count === 0) {
+        textEl.textContent = "GO!";
+        playBeep(880, 0.4);
+      } else {
+        clearInterval(countdownTimer);
+        overlay.classList.add('hidden');
+        
+        // 通信＆画面切替
+        sendCommand("START_MODE" + selectedMode);
+        document.getElementById('panelGameSetup').classList.add('hidden');
+        document.getElementById('panelPlaying').classList.remove('hidden');
+        
+        startTimer();
+      }
+    }, 1000);
+  }
+
+  function startTimer() {
+    stopTimer();
+    gameStartTime = Date.now();
+    totalPausedTime = 0;
+    isTimerPaused = false;
+    warningTriggered = false;
+    document.getElementById('displayScore').textContent = "0";
+    document.getElementById('displayTime').textContent = (selectedMode === 1 || selectedMode === 3) ? "60.0" : "0.0";
+
+    timerInterval = setInterval(() => {
+      if (isTimerPaused) return;
+      const elapsed = (Date.now() - gameStartTime - totalPausedTime) / 1000;
+
+      if (selectedMode === 1 || selectedMode === 3) {
+        const remaining = Math.max(0, 60 - elapsed);
+        document.getElementById('displayTime').textContent = remaining.toFixed(1);
+
+        if (selectedMode === 3 && remaining <= 20.0 && !warningTriggered) {
+          triggerWarningSequence();
+        }
+      } else {
+        document.getElementById('displayTime').textContent = elapsed.toFixed(1);
+      }
+    }, 100);
+  }
+
+  function triggerWarningSequence() {
+    warningTriggered = true;
+    isTimerPaused = true;
+    const pauseStart = Date.now();
+    document.getElementById('warningOverlay').classList.remove("hidden");
+
+    warningSoundInterval = setInterval(() => playBeep(1200, 0.08), 180);
+
+    setTimeout(() => {
+      clearInterval(warningSoundInterval);
+      document.getElementById('warningOverlay').classList.add("hidden");
+      totalPausedTime += (Date.now() - pauseStart);
+      isTimerPaused = false;
+    }, 4000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    if (warningSoundInterval) clearInterval(warningSoundInterval);
+    timerInterval = null;
+    warningSoundInterval = null;
+    document.getElementById('warningOverlay').classList.add("hidden");
+  }
+
+  // --- 通信データハンドリング ---
+  function handleData(event) {
+    const value = new TextDecoder().decode(event.target.value).trim();
+
+    if (value.startsWith("HIT:")) {
       const score = value.split(":")[1];
-      displayScore.textContent = score;
+      document.getElementById('displayScore').textContent = score;
+      playBeep(1200, 0.08);
     } 
     else if (value.startsWith("TIME_UP:")) {
-      const finalScore = value.split(":")[1];
-      displayMsg.textContent = "FINISH!";
-      displayMsg.classList.remove("fever");
-      displayScore.textContent = finalScore;
+      stopTimer();
+      const finalScore = parseInt(value.split(":")[1]) || 0;
+      saveResultAndNext(finalScore, 60.0);
     } 
     else if (value.startsWith("CLEAR:")) {
-      const clearTime = value.split(":")[1];
-      displayMsg.textContent = "CLEAR!";
-      displayScore.textContent = clearTime + "s";
-    } 
-    else if (value === "SPEED_UP") {
-      displayMsg.textContent = "FEVER!";
-      displayMsg.classList.add("fever");
+      stopTimer();
+      const clearTime = parseFloat(value.split(":")[1]) || 0.0;
+      saveResultAndNext(4, clearTime); // スピードクリアは4個全倒し
     }
   }
 
-  // コマンド送信関数
+  // 結果保存 ＆ 次のプレイヤーへ（またはランキング表示）
+  function saveResultAndNext(score, time) {
+    const pName = players[currentPlayerIndex];
+    gameResults.push({ name: pName, score: score, time: time });
+
+    currentPlayerIndex++;
+
+    if (currentPlayerIndex < players.length) {
+      // 次のプレイヤーの準備
+      alert(`${pName} さんのプレイ終了！\n次は ${players[currentPlayerIndex]} さんの番です。`);
+      document.getElementById('panelPlaying').classList.add('hidden');
+      document.getElementById('panelGameSetup').classList.remove('hidden');
+      updateCurrentPlayerDisplay();
+    } else {
+      // 全員終了 ➔ ランキング表示
+      showRanking();
+    }
+  }
+
+  // ランキング画面描画
+  function showRanking() {
+    stopTimer();
+    document.getElementById('panelPlaying').classList.add('hidden');
+    document.getElementById('panelGameSetup').classList.add('hidden');
+    document.getElementById('panelRanking').classList.remove('hidden');
+
+    // ソート順決定
+    // ① スピードクリア(2): タイムが早い順（昇順）
+    // ② タイムアタック(1) / モグラたたき(3): スコアが高い順（降順）
+    if (selectedMode === 2) {
+      gameResults.sort((a, b) => a.time - b.time);
+    } else {
+      gameResults.sort((a, b) => b.score - a.score);
+    }
+
+    const tbody = document.getElementById('rankingBody');
+    tbody.innerHTML = '';
+
+    gameResults.forEach((res, index) => {
+      const rankClass = index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 3 ? 'rank-3' : '';
+      tbody.innerHTML += `
+        <tr>
+          <td class="${rankClass}">${index + 1}位</td>
+          <td>${res.name}</td>
+          <td>${res.score} pt</td>
+          <td>${res.time.toFixed(1)}s</td>
+        </tr>
+      `;
+    });
+  }
+
+  function restartGameSeries() {
+    currentPlayerIndex = 0;
+    gameResults = [];
+    document.getElementById('panelRanking').classList.add('hidden');
+    document.getElementById('panelGameSetup').classList.remove('hidden');
+    updateCurrentPlayerDisplay();
+  }
+
   async function sendCommand(cmd) {
     if (!rxCharacteristic) return;
-    try {
-      const encoder = new TextEncoder();
-      await rxCharacteristic.writeValue(encoder.encode(cmd));
-      log("送信: " + cmd);
-    } catch (error) {
-      log("送信エラー: " + error);
-    }
+    const encoder = new TextEncoder();
+    await rxCharacteristic.writeValue(encoder.encode(cmd));
   }
 
-  // ゲーム開始指示
-  function startGame(modeNum) {
-    displayMsg.classList.remove("fever");
-    displayMsg.textContent = "STANDBY";
-    sendCommand("START_MODE" + modeNum);
-  }
-
-  // ゲーム停止指示
   function stopGame() {
-    displayMsg.classList.remove("fever");
-    displayMsg.textContent = "STOPPED";
+    stopTimer();
     sendCommand("STOP");
-  }
-
-  // ボタン有効/無効切り替え
-  function setButtonsEnabled(enabled) {
-    gameButtons.forEach(btn => btn.disabled = !enabled);
-  }
-
-  // ログ出力関数
-  function log(message) {
-    const now = new Date().toLocaleTimeString();
-    logArea.innerHTML += `[${now}] ${message}<br>`;
-    logArea.scrollTop = logArea.scrollHeight;
+    document.getElementById('panelPlaying').classList.add('hidden');
+    document.getElementById('panelGameSetup').classList.remove('hidden');
   }
 </script>
 </body>
