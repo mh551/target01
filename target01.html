@@ -286,7 +286,7 @@
         optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
       });ice.addEventListener('gattserverdisconnected', onDisconnected);
       const server = await bleDevice.gatt.connect();
-      const service = await server.getPrimaryService(SERVICE_UUID);
+      const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
 
       rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_RX);
       txCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_TX);
