@@ -283,10 +283,13 @@
     try {
       bleDevice = await navigator.bluetooth.requestDevice({
         filters: [{ name: 'Target_01' }],
-        optionalServices: ['4fafc201-1fb5-459e-8fcc-c5c9c331914b']
-      });ice.addEventListener('gattserverdisconnected', onDisconnected);
+        optionalServices: [SERVICE_UUID]
+      });
+      
+      bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+      
       const server = await bleDevice.gatt.connect();
-      const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+      const service = await server.getPrimaryService(SERVICE_UUID);
 
       rxCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_RX);
       txCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID_TX);
